@@ -25,11 +25,20 @@ def db_path() -> str:
     return os.environ.get("T3M_DB", DEFAULT_DB)
 
 
-def connect(path: str) -> sqlite3.Connection:
-    uri = "file:" + pathname2url(path) + "?mode=ro"
-    con = sqlite3.connect(uri, uri=True, timeout=10)
-    con.execute("PRAGMA query_only = ON")
-    return con
+def connect(path: str):
+    """Open read-only. WAL databases without live -shm/-wal files refuse a
+    plain read-only open, so fall back to immutable mode and say so: an
+    immutable read can lag the writer's newest uncheckpointed changes."""
+    base = "file:" + pathname2url(path)
+    try:
+        con = sqlite3.connect(base + "?mode=ro", uri=True, timeout=10)
+        con.execute("PRAGMA query_only = ON")
+        con.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        return con, "ro"
+    except sqlite3.Error:
+        con = sqlite3.connect(base + "?mode=ro&immutable=1", uri=True, timeout=10)
+        con.execute("PRAGMA query_only = ON")
+        return con, "ro+immutable"
 
 
 def table_names(con: sqlite3.Connection) -> list:
@@ -40,21 +49,22 @@ def table_names(con: sqlite3.Connection) -> list:
     return [r[0] for r in rows]
 
 
-def cmd_schema(con: sqlite3.Connection, path: str) -> dict:
+def cmd_schema(con: sqlite3.Connection, path: str, open_mode: str) -> dict:
     tables = []
     for name in table_names(con):
         quoted = '"' + name.replace('"', '""') + '"'
         cols = [r[1] for r in con.execute(f"PRAGMA table_info({quoted})")]
         tables.append({"name": name, "columns": cols})
-    return {"db": path, "tables": tables}
+    return {"db": path, "open_mode": open_mode, "tables": tables}
 
 
-def cmd_health(con: sqlite3.Connection, path: str) -> dict:
+def cmd_health(con: sqlite3.Connection, path: str, open_mode: str) -> dict:
     page_count = con.execute("PRAGMA page_count").fetchone()[0]
     page_size = con.execute("PRAGMA page_size").fetchone()[0]
     journal_mode = con.execute("PRAGMA journal_mode").fetchone()[0]
     return {
         "db": path,
+        "open_mode": open_mode,
         "exists": True,
         "size_bytes": os.path.getsize(path),
         "page_count": page_count,
@@ -74,9 +84,10 @@ def main(argv: list) -> int:
         print(json.dumps({"error": f"database not found: {path}"}))
         return 3
     try:
-        con = connect(path)
+        con, open_mode = connect(path)
         try:
-            result = (cmd_schema if argv[1] == "schema" else cmd_health)(con, path)
+            fn = cmd_schema if argv[1] == "schema" else cmd_health
+            result = fn(con, path, open_mode)
         finally:
             con.close()
     except sqlite3.Error as e:
