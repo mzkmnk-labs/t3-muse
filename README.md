@@ -1,56 +1,69 @@
 # t3-muse
 
-T3 Code を Meta Muse から扱うためのコンパニオン。必要なものを、
-実際に要るものから1つずつ自前で実装していくリポジトリ。
+English | [日本語](README.ja.md)
 
-## 構成図
+A companion for working with T3 Code from Meta Muse. Built
+incrementally and from scratch: each piece is added only when it is
+actually needed.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    User["ユーザー"]
+    User["User"]
     Muse["Muse"]
     subgraph Mac["Mac Studio"]
-        Mailbox["ファイルメールボックス<br/>~/t3-tots-bridge<br/>inbox / outbox / done"]
-        Bridge["bridge.py<br/>launchd 常駐・許可リスト検証"]
-        Reader["t3r.py (読み取り)<br/>~/t3-muse-tools"]
-        Writer["t3w.py (タスク依頼)<br/>~/t3-muse-tools"]
-        T3CLI["t3 thread CLI<br/>T3 Code 同梱"]
-        DB[("T3 Code 状態 DB<br/>~/.t3/userdata/statev2.sqlite")]
+        Mailbox["File mailbox<br/>~/t3-tots-bridge<br/>inbox / outbox / done"]
+        Bridge["bridge.py<br/>launchd daemon, allowlist checks"]
+        Reader["t3r.py (read)<br/>~/t3-muse-tools"]
+        Writer["t3w.py (task requests)<br/>~/t3-muse-tools"]
+        T3CLI["t3 thread CLI<br/>bundled with T3 Code"]
+        DB[("T3 Code state DB<br/>~/.t3/userdata/statev2.sqlite")]
         T3["T3 Code"]
-        Legacy["既存 t3-tots (Grok 用)<br/>~/t3-tots"]
+        Legacy["Existing t3-tots (for Grok)<br/>~/t3-tots"]
     end
-    User -->|"依頼・承認"| Claude
-    Muse -->|"デバイスチャネルで<br/>リクエスト JSON を書く"| Mailbox
-    Mailbox -->|"結果 JSON を返す"| Claude
-    Bridge -->|"inbox をポーリング"| Mailbox
-    Bridge -->|"許可したコマンドだけ実行"| Reader
-    Bridge -->|"許可したコマンドだけ実行"| Writer
-    Reader -->|"読み取り専用で開く"| DB
-    Writer -->|"スレッド作成・送信"| T3CLI
-    T3CLI -->|"ローカルセッション"| T3
-    T3 -->|"読み書き"| DB
-    Legacy -.->|"対象外 (触らない)"| DB
+    User -->|"requests, approvals"| Claude
+    Muse -->|"writes request JSON<br/>via the device channel"| Mailbox
+    Mailbox -->|"returns result JSON"| Claude
+    Bridge -->|"polls the inbox"| Mailbox
+    Bridge -->|"runs allowlisted commands only"| Reader
+    Bridge -->|"runs allowlisted commands only"| Writer
+    Reader -->|"opens read-only"| DB
+    Writer -->|"creates threads, sends prompts"| T3CLI
+    T3CLI -->|"local session"| T3
+    T3 -->|"reads and writes"| DB
+    Legacy -.->|"out of scope (do not touch)"| DB
 ```
 
-要点:
+Key points:
 
-- Mac から Muse へ能動的に接続する経路はない。Muse がデバイスチャネル経由でファイルを置きに・取りに行く (メールボックス方式)
-- ブリッジはネットワークを待ち受けず、許可リスト (`bridge-ping`、`t3r.py` の読み取り系、`t3w.py` のタスク依頼系) 以外は実行しない
-- DB への直接アクセスは読み取り専用のみ。T3 への作業依頼は T3 純正 CLI 経由 (`t3w.py`) だけで、ユーザーの依頼に基づく場合に限る
-- 既存の Grok 用 t3-tots 環境 (`~/t3-tots`) は同じ Mac で稼働しているが、本プロジェクトの対象外
+- There is no path for the Mac to actively connect to Muse. Muse
+  places and fetches files through its device channel — a file mailbox.
+- The bridge listens on no network port and runs nothing outside its
+  allowlist (`bridge-ping`, the read-only `t3r.py` commands, and the
+  task-request `t3w.py` commands).
+- Direct database access is read-only. Task requests to T3 go only
+  through T3 Code's own CLI (`t3w.py`), and only for requests the user
+  actually asked Muse to make.
+- The existing Grok-side t3-tots setup (`~/t3-tots`) runs on the same
+  Mac but is out of scope for this project.
 
-開発フロー: 変更はブランチ → PR → CI (GitHub Actions) → squash マージ。
-`.github/workflows/` のファイルだけは Muse の GitHub App の権限外のため、専用 PAT 経由で push する。
+Development flow: branch → pull request → CI (GitHub Actions) →
+squash merge. Files under `.github/workflows/` are the one exception:
+the Muse GitHub App cannot push them, so they go through a dedicated
+PAT instead.
 
-## 現在の構成
+## Layout
 
-| パス | 内容 |
+| Path | Contents |
 |---|---|
-| `bridge/` | Mac 常駐ブリッジ。Muse のデバイスチャネル経由のファイルメールボックスで、許可リストのコマンドだけを実行する (設計は `bridge/README.md`) |
-| `tools/` | Mac 側の自前ツール群。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list`) |
+| `bridge/` | The always-on Mac bridge. Receives requests through the file mailbox over Muse's device channel and runs allowlisted commands only (design notes in `bridge/README.md`) |
+| `tools/` | Our own Mac-side tools. `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI (`start` / `send` / `show` / `list`) |
 
-## 開発の進め方
+## How development proceeds
 
-- まずブリッジを Mac Studio で動かし、疎通 (bridge-ping) を確認する
-- 次に読み取り専用の最小経路を通す
-- スキルは必要になったものから、実動作に合わせて1つずつ書く
+- First, get the bridge running on the Mac Studio and verify
+  connectivity (bridge-ping)
+- Then open the minimal read-only path
+- Write skills one at a time, as they become necessary, matched to
+  how the system actually behaves
