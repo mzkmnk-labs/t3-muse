@@ -66,6 +66,7 @@ def main() -> None:
         assert r["ok"] and r["exit_code"] == 0, r
         health = json.loads(r["stdout"])
         assert health["table_count"] == 1 and health["exists"], health
+        assert health["open_mode"] == "ro", health
 
         r = roundtrip(dict(req, id="t-schema",
                            argv=["python3", "t3r.py", "schema"]))
