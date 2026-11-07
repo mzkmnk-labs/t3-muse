@@ -1,0 +1,28 @@
+{
+  "name": "@mzkmnk-labs/t3-muse",
+  "version": "0.1.0",
+  "description": "Installs the Mac side of t3-muse: the file mailbox bridge daemon and its tools.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mzkmnk-labs/t3-muse.git"
+  },
+  "bin": {
+    "t3-muse": "installer/t3-muse.js"
+  },
+  "files": [
+    "installer/t3-muse.js",
+    "bridge/bridge.py",
+    "bridge/restart-bridge.sh",
+    "bridge/com.muse.t3bridge.plist",
+    "bridge/com.muse.t3bridge-restarter.plist",
+    "tools/t3r.py",
+    "tools/t3w.py",
+    "tools/t3a.py"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

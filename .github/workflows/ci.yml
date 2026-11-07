@@ -13,8 +13,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
       - name: Compile check
-        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py bridge/test_restarter.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py hooks/skill_audit.py hooks/test_skill_audit.py
+        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py bridge/test_restarter.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py hooks/skill_audit.py hooks/test_skill_audit.py installer/test_t3_muse.py
+      - name: Installer syntax check
+        run: node --check installer/t3-muse.js
       - name: Plist sanity check
         run: |
           python -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge.plist','rb'))"
@@ -33,3 +38,5 @@ jobs:
         run: python tools/test_t3a.py
       - name: Skill audit unit tests
         run: python hooks/test_skill_audit.py
+      - name: Installer dry-run test
+        run: python installer/test_t3_muse.py
