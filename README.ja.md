@@ -40,6 +40,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 |---|---|
 | `bridge/` | Mac 常駐ブリッジ (経路2)。ペアデバイス経由のファイルメールボックスで、許可リストのコマンドだけを実行する (設計は `bridge/README.md`) |
 | `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `pending` / `answer`) |
+| `skills/t3-muse-starter/` | t3-muse をまっさらな状態からセットアップして日々運用するための Muse 用カスタム skill。Muse が PM、T3 Code が実装を担当する |
 
 ## 承認と質問への回答
 
