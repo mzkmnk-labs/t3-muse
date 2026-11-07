@@ -8,7 +8,7 @@ actually needed.
 
 ## Architecture
 
-![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Claude, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Claude. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py and t3w.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 thread CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch).](docs/architecture.svg)
+![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Claude, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Claude. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py and t3w.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 thread CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch). Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, which restarts only the bridge job.](docs/architecture.svg)
 
 Key points:
 
@@ -17,6 +17,10 @@ Key points:
 - The bridge listens on no network port and runs nothing outside its
   allowlist (`bridge-ping`, the read-only `t3r.py` commands, and the
   task-request `t3w.py` commands).
+- The bridge cannot restart itself, so a separate launchd job does it:
+  a file dropped into `~/t3-muse-bridge/restart-trigger` runs
+  `restart-bridge.sh`, which restarts only the bridge job. The bridge
+  gains no `launchctl` rights.
 - Direct database access is read-only. Task requests to T3 go only
   through T3 Code's own CLI (`t3w.py`), and only for requests the user
   actually asked Muse to make.
@@ -32,7 +36,7 @@ PAT instead.
 
 | Path | Contents |
 |---|---|
-| `bridge/` | The always-on Mac bridge. Receives requests through the file mailbox over Muse's device channel and runs allowlisted commands only (design notes in `bridge/README.md`) |
+| `bridge/` | The always-on Mac bridge. Receives requests through the file mailbox over Muse's device channel and runs allowlisted commands only, plus a small launchd job that restarts it (design notes in `bridge/README.md`) |
 | `tools/` | Our own Mac-side tools. `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI (`start` / `send` / `show` / `list` / `add-project`) |
 
 ## How development proceeds

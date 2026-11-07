@@ -24,7 +24,7 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-muse-bri
 - 任意のシェルコマンドは実行できない。SSH のようなフルシェル権限にはならない
 - ネットワークの待ち受けポートなし。入力はローカルフォルダのファイルだけ
 - リクエスト/結果はすべて done/ と outbox/ に残るので後から監査できる
-- 止め方: `launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist`、またはフォルダごと削除
+- 止め方: 2 つの plist を unload する（`launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`）、またはフォルダごと削除
 
 ## 導入
 
@@ -36,6 +36,32 @@ Mac 側でチェックアウト（ghq 管理なら worktree）から:
 3. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge.plist > ~/Library/LaunchAgents/com.muse.t3bridge.plist`
 4. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
 5. Muse が `bridge-ping` リクエストで疎通確認
+
+続けて再起動ジョブを入れる。`launchctl load` が必要なのはこの 1 回だけ:
+
+1. `mkdir -p ~/t3-muse-bridge/restart-trigger`
+2. `cp bridge/restart-bridge.sh ~/t3-muse-bridge/ && chmod +x ~/t3-muse-bridge/restart-bridge.sh`
+3. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge-restarter.plist > ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`
+4. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`
+
+## ブリッジの再起動 (Restarting the bridge)
+
+ブリッジは自分自身を再起動できない。unload した時点でプロセスが止まり、load し直す主体が残らないため。そこで再起動だけを担当する小さな launchd ジョブを別に置く。
+
+1. 新しい `bridge.py` を `~/t3-muse-bridge/` にコピーする
+2. `~/t3-muse-bridge/inbox/` が空なのを確かめる（理由は下記）
+3. `touch ~/t3-muse-bridge/restart-trigger/restart` でファイルを置く。名前も中身も問わない
+4. launchd がそれを検知して `restart-bridge.sh` を起動する。スクリプトはトリガーを消し、`launchctl kickstart -k` でブリッジのジョブだけを再起動し、終了コードを `restart.log` に 1 行追記する
+5. `tail ~/t3-muse-bridge/restart.log` の最終行が `kickstart exit=0` であること、`bridge-ping` に応答があることを確認する
+
+前回の実行や起動から 10 秒以内は launchd の制限で待たされるので、確認は 10〜20 秒ほど待ってから行う。トリガーが消えることはない。kickstart が失敗したときは launchctl のエラー文が同じログに残る（`exit=113` はブリッジのジョブが読み込まれていない状態）。
+
+安全面:
+
+- スクリプトは引数を取らず、トリガーの中身も読まない。トリガーでできるのは `com.muse.t3bridge` の再起動だけ
+- ブリッジ本体に launchctl の権限は増えない。`bridge.py` は変更なしで、許可リストにも再起動コマンドはない
+- 再起動は実行中のリクエストを中断する。リクエストは完了後に `done/` へ移るため、中断されたものは `inbox/` に残って再起動後にもう一度実行される。`t3w.py` の `start` / `send` が二重に実行されうるので、`inbox/` が空のときにトリガーを置く
+- 止め方は 2 つの plist の unload。ブリッジだけ unload した状態でトリガーを置いても、kickstart が失敗するだけでブリッジは起動しない
 
 ## リクエスト形式
 
