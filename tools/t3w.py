@@ -2,10 +2,12 @@
 """t3w: ask T3 Code to do work, via the `t3 thread` CLI bundled with it.
 
 Subcommands (all print the CLI's JSON output):
-    python3 t3w.py start <project> <message> [--wait]
+    python3 t3w.py start <project> <message> [--worktree <ref>
+                       [--branch <name>]] [--wait]
     python3 t3w.py send <thread-id> <message> [--wait]
     python3 t3w.py show <thread-id>
     python3 t3w.py list [project]
+    python3 t3w.py add-project <path> [--title <title>]
 
 <project> is a project id or any path inside the project's folder.
 `start` prints {"threadId", "projectId", "runId"}. With --wait the tool
@@ -35,26 +37,59 @@ def fail(message: str, code: int) -> int:
     return code
 
 
+def _parse_start(rest: list):
+    """Parse start arguments into a CLI call, or None when malformed."""
+    if len(rest) < 2:
+        return None
+    call = ["thread", "start", rest[0], rest[1]]
+    tail = rest[2:]
+    wait = False
+    i = 0
+    while i < len(tail):
+        token = tail[i]
+        if token == "--wait":
+            wait = True
+            i += 1
+        elif token in ("--worktree", "--branch") and i + 1 < len(tail):
+            call += [token, tail[i + 1]]
+            i += 2
+        else:
+            return None
+    if wait:
+        call.append("--wait")
+    call.append("--json")
+    return call
+
+
 def build_call(argv: list):
-    """Translate our argv into the t3 CLI argv, or return an error."""
+    """Translate our argv into the t3 CLI argv, or return None."""
     cmd, rest = argv[1], argv[2:]
     wait = bool(rest) and rest[-1] == "--wait"
     if wait:
         rest = rest[:-1]
-    if cmd == "start" and len(rest) == 2:
-        call = ["thread", "start", rest[0], rest[1], "--json"]
-    elif cmd == "send" and len(rest) == 2:
-        call = ["thread", "send", rest[0], rest[1], "--json"]
+    if cmd == "start":
+        return _parse_start(argv[2:])
+    if cmd == "add-project" and not wait:
+        # No --json here: `t3 project add` predates the JSON output
+        # convention; pass its plain output through.
+        if len(rest) == 1:
+            return ["project", "add", rest[0]]
+        if len(rest) == 3 and rest[1] == "--title":
+            return ["project", "add", rest[0], "--title", rest[2]]
+        return None
+    if cmd == "send" and len(rest) == 2:
+        call = ["thread", "send", rest[0], rest[1]]
     elif cmd == "show" and len(rest) == 1 and not wait:
-        call = ["thread", "show", rest[0], "--json"]
+        call = ["thread", "show", rest[0]]
     elif cmd == "list" and len(rest) <= 1 and not wait:
-        call = ["thread", "list", "--json"]
+        call = ["thread", "list"]
         if rest:
             call += ["--project", rest[0]]
     else:
         return None
     if wait:
         call.append("--wait")
+    call.append("--json")
     return call
 
 

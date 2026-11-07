@@ -47,7 +47,23 @@ class T3wTest(unittest.TestCase):
         out = json.loads(proc.stdout)
         self.assertEqual(out["argv"],
                          ["thread", "send", "tid-123", "Now fix it",
-                          "--json", "--wait"])
+                          "--wait", "--json"])
+
+    def test_start_with_worktree(self):
+        proc = self.run_t3w("start", "/path/to/project", "Fix the tests",
+                            "--worktree", "main",
+                            "--branch", "docs/rich-diagram")
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["argv"],
+                         ["thread", "start", "/path/to/project",
+                          "Fix the tests", "--worktree", "main",
+                          "--branch", "docs/rich-diagram", "--json"])
+
+    def test_start_flag_without_value(self):
+        proc = self.run_t3w("start", "/path/to/project", "Fix",
+                            "--worktree")
+        self.assertEqual(proc.returncode, 2)
 
     def test_show_and_list(self):
         proc = self.run_t3w("show", "tid-123")
@@ -55,8 +71,17 @@ class T3wTest(unittest.TestCase):
                          ["thread", "show", "tid-123", "--json"])
         proc = self.run_t3w("list", "/path/to/project")
         self.assertEqual(json.loads(proc.stdout)["argv"],
-                         ["thread", "list", "--json",
-                          "--project", "/path/to/project"])
+                         ["thread", "list",
+                          "--project", "/path/to/project", "--json"])
+
+    def test_add_project(self):
+        proc = self.run_t3w("add-project", "/path/to/project",
+                            "--title", "Demo")
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["argv"],
+                         ["project", "add", "/path/to/project",
+                          "--title", "Demo"])
 
     def test_missing_cli(self):
         proc = self.run_t3w("list", cli=Path(self.tmp) / "nope")
