@@ -8,6 +8,7 @@ object to stdout.
 Usage:
     python3 t3r.py schema    table and column names, no row data
     python3 t3r.py health    database presence, size and table count
+    python3 t3r.py status    thread overview from the projection tables
 
 The database path defaults to ~/.t3/userdata/statev2.sqlite and can be
 overridden with the T3M_DB environment variable.
@@ -107,9 +108,67 @@ def cmd_health(con: sqlite3.Connection, path: str, open_mode: str) -> dict:
     }
 
 
+def cmd_status(con: sqlite3.Connection, path: str, open_mode: str) -> dict:
+    if "projection_threads" not in table_names(con):
+        raise sqlite3.Error("table projection_threads not found")
+    counts = con.execute(
+        "SELECT"
+        " SUM(CASE WHEN deleted_at IS NULL AND archived_at IS NULL"
+        "          THEN 1 ELSE 0 END),"
+        " SUM(CASE WHEN deleted_at IS NULL AND archived_at IS NOT NULL"
+        "          THEN 1 ELSE 0 END),"
+        " SUM(CASE WHEN deleted_at IS NULL AND archived_at IS NULL"
+        "          AND pending_approval_count > 0 THEN 1 ELSE 0 END),"
+        " SUM(CASE WHEN deleted_at IS NULL AND archived_at IS NULL"
+        "          AND pending_user_input_count > 0 THEN 1 ELSE 0 END)"
+        " FROM projection_threads"
+    ).fetchone()
+    rows = con.execute(
+        "SELECT t.thread_id, t.title, p.title, t.branch,"
+        " t.pending_approval_count, t.pending_user_input_count,"
+        " t.updated_at, t.latest_user_message_at,"
+        " s.status, s.provider_name, s.last_error"
+        " FROM projection_threads t"
+        " LEFT JOIN projection_projects p ON p.project_id = t.project_id"
+        " LEFT JOIN projection_thread_sessions s"
+        "   ON s.thread_id = t.thread_id"
+        " WHERE t.deleted_at IS NULL AND t.archived_at IS NULL"
+        " ORDER BY t.updated_at DESC LIMIT 30"
+    )
+    threads = []
+    for r in rows:
+        threads.append({
+            "thread_id": r[0],
+            "title": r[1],
+            "project_title": r[2],
+            "branch": r[3],
+            "pending_approval_count": r[4],
+            "pending_user_input_count": r[5],
+            "updated_at": r[6],
+            "latest_user_message_at": r[7],
+            "session_status": r[8],
+            "provider": r[9],
+            "last_error": (r[10] or "")[:300] or None,
+        })
+    return {
+        "db": path,
+        "open_mode": open_mode,
+        "counts": {
+            "visible_threads": counts[0] or 0,
+            "archived_threads": counts[1] or 0,
+            "threads_waiting_approval": counts[2] or 0,
+            "threads_waiting_input": counts[3] or 0,
+        },
+        "threads": threads,
+    }
+
+
 def main(argv: list) -> int:
-    if len(argv) != 2 or argv[1] not in ("schema", "health"):
-        print(json.dumps({"error": "usage: t3r.py schema|health"}))
+    commands = {"schema": cmd_schema, "health": cmd_health,
+                "status": cmd_status}
+    if len(argv) != 2 or argv[1] not in commands:
+        print(json.dumps(
+            {"error": "usage: t3r.py schema|health|status"}))
         return 2
     path = db_path()
     if not os.path.isfile(path):
@@ -124,8 +183,7 @@ def main(argv: list) -> int:
         }))
         return 4
     try:
-        fn = cmd_schema if argv[1] == "schema" else cmd_health
-        result = fn(con, path, open_mode)
+        result = commands[argv[1]](con, path, open_mode)
     except sqlite3.Error as e:
         print(json.dumps({"error": f"sqlite error: {e}"}))
         return 4
