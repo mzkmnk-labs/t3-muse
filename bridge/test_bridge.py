@@ -14,7 +14,7 @@ from pathlib import Path
 def main() -> None:
     root = Path(tempfile.mkdtemp(prefix="bridge-test-"))
     home = root / "home"
-    base = home / "t3-tots-bridge"
+    base = home / "t3-muse-bridge"
     for name in ("inbox", "outbox", "done"):
         (base / name).mkdir(parents=True)
     env = dict(os.environ, HOME=str(home))
