@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 800" width="1160" height="800" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 950" width="1160" height="950" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse architecture / t3-muse 構成図</title>
-  <desc id="desc">User sends requests and approvals to Muse. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 thread CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope.</desc>
+  <desc id="desc">User sends requests and approvals to Muse. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope.</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -108,20 +108,20 @@
     <marker id="arrow-old" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-old" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
   </defs>
 
-  <rect class="card" width="1160" height="800" rx="16"/>
+  <rect class="card" width="1160" height="950" rx="16"/>
 
   <!-- Boundaries -->
   <g class="mac">
-    <rect x="16" y="172" width="1128" height="612" rx="18"/>
+    <rect x="16" y="172" width="1128" height="762" rx="18"/>
     <text class="t" x="36" y="206">Mac Studio</text>
   </g>
   <g class="group-muse">
-    <rect x="238" y="372" width="890" height="158" rx="14"/>
+    <rect x="238" y="372" width="890" height="318" rx="14"/>
     <text x="261" y="395"><tspan class="s" font-weight="700">t3-muse</tspan><tspan class="s" dx="8">this repo / 本リポジトリ</tspan></text>
   </g>
   <g class="group-t3">
-    <rect x="32" y="602" width="1096" height="168" rx="14"/>
-    <text x="462" y="626"><tspan class="s" font-weight="700">T3 Code</tspan><tspan class="s" dx="8">side / T3 Code 側</tspan></text>
+    <rect x="32" y="752" width="1096" height="168" rx="14"/>
+    <text x="462" y="776"><tspan class="s" font-weight="700">T3 Code</tspan><tspan class="s" dx="8">side / T3 Code 側</tspan></text>
   </g>
 
   <!-- Edges: data-from and data-to use the node ids below; each arrow points at data-to -->
@@ -160,29 +160,44 @@
     <text class="c" x="873" y="498">だけ実行</text>
   </g>
   <g class="edge from-muse" data-from="Reader" data-to="DB">
-    <path marker-end="url(#arrow-muse)" d="M341 516 V639"/>
+    <path marker-end="url(#arrow-muse)" d="M341 516 V789"/>
     <text x="351" y="558">opens read-only</text>
     <text x="351" y="579">読み取り専用で開く</text>
   </g>
   <g class="edge from-muse" data-from="Writer" data-to="T3CLI">
-    <path marker-end="url(#arrow-muse)" d="M1025 516 V648"/>
+    <path marker-end="url(#arrow-muse)" d="M1025 516 V798"/>
     <text class="e" x="1015" y="558">creates threads, sends prompts</text>
     <text class="e" x="1015" y="579">スレッド作成・送信</text>
   </g>
   <g class="edge from-t3" data-from="T3CLI" data-to="T3">
-    <path marker-end="url(#arrow-t3)" d="M930 698 H770"/>
-    <text class="c" x="849" y="688">local session</text>
-    <text class="c" x="849" y="719">ローカルセッション</text>
+    <path marker-end="url(#arrow-t3)" d="M930 848 H770"/>
+    <text class="c" x="849" y="838">local session</text>
+    <text class="c" x="849" y="869">ローカルセッション</text>
   </g>
   <g class="edge from-t3" data-from="T3" data-to="DB">
-    <path marker-end="url(#arrow-t3)" d="M598 698 H442"/>
-    <text class="c" x="519" y="688">reads and writes</text>
-    <text class="c" x="519" y="719">読み書き</text>
+    <path marker-end="url(#arrow-t3)" d="M598 848 H442"/>
+    <text class="c" x="519" y="838">reads and writes</text>
+    <text class="c" x="519" y="869">読み書き</text>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Answers">
+    <path marker-end="url(#arrow-muse)" d="M683 516 V564"/>
+    <text class="e" x="673" y="534">runs allowlisted commands only</text>
+    <text class="e" x="673" y="554">許可したコマンドだけ実行</text>
+  </g>
+  <g class="edge from-muse" data-from="Answers" data-to="T3">
+    <path marker-end="url(#arrow-muse)" d="M683 678 V812"/>
+    <text x="693" y="712">WebSocket on loopback</text>
+    <text x="693" y="733">ループバックの WebSocket</text>
+  </g>
+  <g class="edge from-muse" data-from="Answers" data-to="T3CLI">
+    <path marker-end="url(#arrow-muse)" d="M801 622 H960 V798"/>
+    <text class="e" x="950" y="650">issues its token once</text>
+    <text class="e" x="950" y="671">トークンを発行</text>
   </g>
   <g class="edge dashed from-old" data-from="Legacy" data-to="DB">
-    <path marker-end="url(#arrow-old)" d="M104 516 V641"/>
-    <text x="114" y="558">out of scope (do not touch)</text>
-    <text x="114" y="579">対象外 (触らない)</text>
+    <path marker-end="url(#arrow-old)" d="M104 516 V791"/>
+    <text x="114" y="712">out of scope (do not touch)</text>
+    <text x="114" y="733">対象外 (触らない)</text>
   </g>
 
   <!-- Outside the Mac -->
@@ -229,6 +244,13 @@
     <text class="s c" x="1025" y="472">タスク依頼</text>
     <text class="p mono c" x="1025" y="498">~/t3-muse-tools</text>
   </g>
+  <g id="node-Answers" class="muse">
+    <rect class="shape" x="565" y="566" width="236" height="112" rx="12"/>
+    <text class="t mono c" x="683" y="593">t3a.py</text>
+    <text class="s c" x="683" y="615">relays the user's answers</text>
+    <text class="s c" x="683" y="634">ユーザーの回答を中継</text>
+    <text class="p mono c" x="683" y="660">~/t3-muse-tools</text>
+  </g>
   <g id="node-Legacy" class="old">
     <rect class="shape" x="32" y="404" width="190" height="112" rx="12"/>
     <text class="t c" x="127" y="431" style="font-size:16.5px">Existing t3-tots</text>
@@ -237,20 +259,20 @@
     <text class="p mono c" x="127" y="498">~/t3-tots</text>
   </g>
   <g id="node-DB" class="t3">
-    <path class="shape" d="M48 652 A196 13 0 0 1 440 652 V742 A196 13 0 0 1 48 742 Z"/>
-    <ellipse class="lid" cx="244" cy="652" rx="196" ry="13"/>
-    <text class="t c" x="244" y="689">T3 Code state DB</text>
-    <text class="s c" x="244" y="710">T3 Code 状態 DB</text>
-    <text class="p mono c" x="244" y="734">~/.t3/userdata/statev2.sqlite</text>
+    <path class="shape" d="M48 802 A196 13 0 0 1 440 802 V892 A196 13 0 0 1 48 892 Z"/>
+    <ellipse class="lid" cx="244" cy="802" rx="196" ry="13"/>
+    <text class="t c" x="244" y="839">T3 Code state DB</text>
+    <text class="s c" x="244" y="860">T3 Code 状態 DB</text>
+    <text class="p mono c" x="244" y="884">~/.t3/userdata/statev2.sqlite</text>
   </g>
   <g id="node-T3" class="t3">
-    <rect class="shape" x="598" y="664" width="170" height="68" rx="12"/>
-    <text class="t c" x="683" y="704">T3 Code</text>
+    <rect class="shape" x="598" y="814" width="170" height="68" rx="12"/>
+    <text class="t c" x="683" y="854">T3 Code</text>
   </g>
   <g id="node-T3CLI" class="t3">
-    <rect class="shape" x="930" y="650" width="190" height="96" rx="12"/>
-    <text class="t mono c" x="1025" y="679" style="font-size:17px">t3 thread CLI</text>
-    <text class="s c" x="1025" y="702">bundled with T3 Code</text>
-    <text class="s c" x="1025" y="724">T3 Code 同梱</text>
+    <rect class="shape" x="930" y="800" width="190" height="96" rx="12"/>
+    <text class="t mono c" x="1025" y="829" style="font-size:17px">t3 CLI</text>
+    <text class="s c" x="1025" y="852">bundled with T3 Code</text>
+    <text class="s c" x="1025" y="874">T3 Code 同梱</text>
   </g>
 </svg>
