@@ -35,7 +35,7 @@ MAX_OUTPUT = 200_000  # bytes per stream
 READER_SUBCOMMANDS = {"schema", "health", "status"}
 WRITER_SUBCOMMANDS = {"start", "send", "show", "list", "add-project"}
 ENV_WHITELIST = {"T3M_DB", "T3M_T3CLI"}
-THREAD_ID = re.compile(r"^[0-9a-fA-F-]{32,40}$")
+THREAD_ID = re.compile(r"^(?:mcp:)?[0-9a-fA-F-]{32,40}\Z")
 SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
 MAX_MESSAGE = 20_000
 
