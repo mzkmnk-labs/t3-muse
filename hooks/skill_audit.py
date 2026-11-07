@@ -26,7 +26,7 @@ SKILL_PATH = "skills/t3-muse-starter/SKILL.md"
 GIT_TIMEOUT_SECONDS = 10
 
 # Commands whose completion is worth an audit. Matched as substrings, so a
-# wrapped call such as "agent-auth gh pr create" counts too.
+# wrapped call such as "wrapper gh pr create" counts too.
 AUDITED_COMMANDS = ("git commit", "gh pr create")
 
 # The areas the skill describes. An entry ending in "/" covers that directory
