@@ -23,7 +23,7 @@ BASE = os.path.expanduser("~/t3-tots-bridge")
 INBOX = os.path.join(BASE, "inbox")
 OUTBOX = os.path.join(BASE, "outbox")
 DONE = os.path.join(BASE, "done")
-TOOLS = os.path.expanduser("~/t3-tots")
+TOOLS = os.path.expanduser("~/t3-muse-tools")
 
 POLL_SECONDS = 0.5
 DEFAULT_TIMEOUT = 120
