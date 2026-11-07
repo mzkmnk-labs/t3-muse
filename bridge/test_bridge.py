@@ -75,6 +75,14 @@ def main() -> None:
         assert schema["tables"][0]["name"] == "threads", schema
         assert "title" in schema["tables"][0]["columns"], schema
 
+        # status is allowlisted too; the fixture lacks projection tables,
+        # so the reader itself reports that (exit 4) instead of running
+        # something unintended
+        r = roundtrip(dict(req, id="t-status",
+                           argv=["python3", "t3r.py", "status"]))
+        assert r["ok"] and r["exit_code"] == 4, r
+        assert "projection_threads" in r["stdout"], r
+
         print("bridge smoke test: OK")
     finally:
         proc.terminate()

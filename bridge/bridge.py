@@ -8,7 +8,8 @@ writes results to ~/t3-tots-bridge/outbox/<id>.json.
 Design rules:
 - No network listener. The only input is local files in the inbox folder.
 - Allowlist only: the built-in bridge-ping and our own read-only
-  reader t3r.py (schema / health). No arbitrary shell, no other programs.
+  reader t3r.py (schema / health / status). No arbitrary shell,
+  no other programs.
 - Every request and result is archived under done/ for audit.
 """
 import json
@@ -28,7 +29,7 @@ POLL_SECONDS = 0.5
 DEFAULT_TIMEOUT = 120
 MAX_OUTPUT = 200_000  # bytes per stream
 
-READER_SUBCOMMANDS = {"schema", "health"}
+READER_SUBCOMMANDS = {"schema", "health", "status"}
 ENV_WHITELIST = {"T3M_DB"}
 
 
