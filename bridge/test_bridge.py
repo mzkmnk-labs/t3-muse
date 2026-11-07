@@ -10,8 +10,44 @@ import tempfile
 import time
 from pathlib import Path
 
+import bridge
+
+UUID = "0f8fad5b-d9cb-469f-a165-70867728950e"
+
+
+def thread_id_commands(tid: str) -> list:
+    return [["python3", "t3w.py", "show", tid],
+            ["python3", "t3w.py", "send", tid, "hi"]]
+
+
+def check_thread_id_validation() -> None:
+    accepted = [
+        UUID, UUID.upper(), "a" * 32, "a" * 40,
+        f"mcp:{UUID}", f"mcp:{UUID.upper()}",
+        "mcp:" + "a" * 32, "mcp:" + "a" * 40,
+    ]
+    rejected = [
+        # mcp: with a non-uuid suffix, or one outside the length bounds
+        "mcp:", "mcp:not-a-thread-id", "mcp:" + "g" * 36,
+        "mcp:" + "a" * 31, "mcp:" + "a" * 41, "a" * 31, "a" * 41,
+        # anything but the exact prefix
+        f"http:{UUID}", f"MCP:{UUID}", f"mcp:mcp:{UUID}", f":{UUID}", "",
+        # spaces and shell metacharacters, with and without the prefix
+        f"{UUID} x", f"mcp:{UUID} x", f"mcp: {UUID}", f" mcp:{UUID}",
+        f"{UUID};ls", f"mcp:{UUID};ls", f"mcp;{UUID}",
+        f"{UUID}\n", f"mcp:{UUID}\n",
+    ]
+    for tid in accepted:
+        for argv in thread_id_commands(tid):
+            assert bridge.validate(argv) is None, argv
+    for tid in rejected:
+        for argv in thread_id_commands(tid):
+            assert "valid thread id" in (bridge.validate(argv) or ""), argv
+
 
 def main() -> None:
+    check_thread_id_validation()
+
     root = Path(tempfile.mkdtemp(prefix="bridge-test-"))
     home = root / "home"
     base = home / "t3-muse-bridge"
@@ -113,6 +149,14 @@ def main() -> None:
         r = roundtrip(dict(wreq, id="t-wbogus",
                            argv=["python3", "t3w.py", "bogus"]))
         assert not r["ok"] and r["exit_code"] == 2, r
+
+        # show and send reach the CLI with bare and mcp: ids unchanged
+        for n, tid in enumerate((UUID, f"mcp:{UUID}")):
+            for argv in thread_id_commands(tid):
+                r = roundtrip(dict(wreq, id=f"t-wid{n}-{argv[2]}", argv=argv))
+                assert r["ok"] and r["exit_code"] == 0, r
+                sent = json.loads(r["stdout"])["argv"]
+                assert sent == ["thread", *argv[2:], "--json"], r
 
         # worktree start passes the flags through; unsafe values rejected
         r = roundtrip(dict(wreq, id="t-wworktree",
