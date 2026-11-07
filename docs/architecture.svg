@@ -204,7 +204,7 @@
   <g id="node-Mailbox" class="box">
     <rect class="shape" x="493" y="204" width="380" height="96" rx="14"/>
     <text class="c" x="683" y="232"><tspan class="t">File mailbox</tspan><tspan class="s" dx="10">ファイルメールボックス</tspan></text>
-    <text class="p mono c" x="683" y="255">~/t3-tots-bridge</text>
+    <text class="p mono c" x="683" y="255">~/t3-muse-bridge</text>
     <rect class="chip" x="556" y="265" width="78" height="24" rx="6"/>
     <text class="chip-label mono c" x="595" y="282">inbox</text>
     <rect class="chip" x="644" y="265" width="78" height="24" rx="6"/>
