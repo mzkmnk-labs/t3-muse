@@ -17,7 +17,8 @@ const USAGE = `usage: t3-muse <command>
 
 commands:
   install            place the bridge and tools, load both LaunchAgents and verify
-                     them through the mailbox; safe to run again
+                     them through the mailbox; safe to run again. On a terminal,
+                     offers to issue the t3a token if there is no token file
   status             report the state of the install; for the t3a token it only
                      says whether the file exists, never what is in it
   uninstall          unload both LaunchAgents and delete their plists; keeps the
@@ -32,6 +33,11 @@ const QUARANTINE = 'com.apple.quarantine';
 const BRIDGE_LABEL = 'com.muse.t3bridge';
 const RESTARTER_LABEL = 'com.muse.t3bridge-restarter';
 const PURGE_WORD = 'purge';
+const TOKEN_PROMPT = 'No t3a token found. Issue one now? [y/N] ';
+// What t3a.py issue-token asks for. test_t3_muse.py holds these to tools/t3a.py.
+const TOKEN_SCOPES = ['orchestration:read', 'orchestration:operate'];
+const TOKEN_TTL_DAYS = 90;
+const REVOKE_STEPS = '~/.t3/bin/t3 auth session list, then ~/.t3/bin/t3 auth session revoke <session-id>';
 
 const POLL_MS = 100;
 const COMMAND_TIMEOUT_MS = 30_000;
@@ -40,6 +46,10 @@ const INBOX_DRAIN_WAIT_MS = 15_000;
 const PING_WAIT_MS = 30_000;
 const BRIDGE_TIMEOUT_SECONDS = 60; // how long the bridge lets a tool run
 const TOOL_WAIT_MS = 75_000;
+// t3a gives the T3 CLI 60s and removes the token file if that fails. A bridge
+// timeout that cut in first would kill t3a before that and leave the file behind.
+const ISSUE_BRIDGE_TIMEOUT_SECONDS = 120;
+const ISSUE_WAIT_MS = 135_000;
 
 const PROBES = [
   {
@@ -62,6 +72,15 @@ const PROBES = [
   },
 ];
 const PING = PROBES[0];
+const PENDING = PROBES[2];
+
+const ISSUE_TOKEN = {
+  name: 't3a issue-token',
+  argv: ['python3', 't3a.py', 'issue-token'],
+  waitMs: ISSUE_WAIT_MS,
+  bridgeTimeoutSeconds: ISSUE_BRIDGE_TIMEOUT_SECONDS,
+  accept: (out) => (out && out.issued === true ? out : null),
+};
 
 const NEXT_STEPS = {
   NO_TOKEN: 'Issue the t3a token once: python3 ~/t3-muse-tools/t3a.py issue-token',
@@ -269,14 +288,14 @@ async function loadJob(job) {
 // --- mailbox -------------------------------------------------------------
 
 // Returns the bridge's result, or null when it did not answer in time.
-async function askBridge(paths, argv, waitMs) {
+async function askBridge(paths, argv, waitMs, bridgeTimeoutSeconds = BRIDGE_TIMEOUT_SECONDS) {
   const id = `t3-muse-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
   const request = path.join(paths.inbox, `${id}.json`);
   const answer = path.join(paths.outbox, `${id}.json`);
   // The bridge takes any *.json on its next poll, so that name appears only
   // once the content is complete.
   const draft = path.join(paths.inbox, `.${id}.tmp`);
-  fs.writeFileSync(draft, JSON.stringify({ id, argv, timeout: BRIDGE_TIMEOUT_SECONDS }), { flag: 'wx' });
+  fs.writeFileSync(draft, JSON.stringify({ id, argv, timeout: bridgeTimeoutSeconds }), { flag: 'wx' });
   fs.renameSync(draft, request);
   if (await waitUntil(() => exists(answer), waitMs)) {
     return JSON.parse(fs.readFileSync(answer, 'utf8'));
@@ -296,7 +315,7 @@ function toolFailure(result) {
 }
 
 async function runProbe(paths, probe) {
-  const result = await askBridge(paths, probe.argv, probe.waitMs);
+  const result = await askBridge(paths, probe.argv, probe.waitMs, probe.bridgeTimeoutSeconds);
   if (result === null) {
     return { ok: false, message: `no answer in ${probe.waitMs / 1000}s; look in ${paths.log}` };
   }
@@ -309,6 +328,31 @@ async function runProbe(paths, probe) {
 }
 
 // --- subcommands ---------------------------------------------------------
+
+// NO_TOKEN also covers a file with nothing usable in it, and issue-token refuses
+// to overwrite that. Only a person at a terminal can agree to a new credential,
+// so anything else, such as a script piping in a y, is never asked.
+function canOfferToken(paths, outcome) {
+  return outcome.code === 'NO_TOKEN' && !exists(paths.token) && process.stdin.isTTY === true;
+}
+
+function reportIssued(issued) {
+  console.log('Issued a t3a token. Its value is never shown.');
+  console.log(`  scopes:  ${TOKEN_SCOPES.join(', ')}`);
+  console.log(`  ttl:     ${TOKEN_TTL_DAYS} days, expires ${issued.expires_at}`);
+  console.log(`  file:    ${issued.token_path}`);
+  console.log(`  revoke:  ${REVOKE_STEPS}, then delete the file`);
+}
+
+function reportIncomplete(paths, probe, outcome) {
+  console.error(`${probe.name}: FAILED: ${outcome.message}`);
+  console.error(`\ninstall is not complete: ${probe.name} did not pass.`);
+  // For an unusable token file, the message from t3a already says what to do.
+  const unusableFile = outcome.code === 'NO_TOKEN' && exists(paths.token);
+  if (NEXT_STEPS[outcome.code] && !unusableFile) console.error(NEXT_STEPS[outcome.code]);
+  console.error('The files and LaunchAgents stay in place. Fix this and run install again.');
+  return 1;
+}
 
 async function install(paths) {
   preflight();
@@ -338,14 +382,17 @@ async function install(paths) {
   console.log(`loaded ${paths.jobs.map((job) => job.label).join(' and ')}`);
 
   for (const probe of PROBES) {
-    const outcome = await runProbe(paths, probe);
-    if (!outcome.ok) {
-      console.error(`${probe.name}: FAILED: ${outcome.message}`);
-      console.error(`\ninstall is not complete: ${probe.name} did not pass.`);
-      if (NEXT_STEPS[outcome.code]) console.error(NEXT_STEPS[outcome.code]);
-      console.error('The files and LaunchAgents stay in place. Fix this and run install again.');
-      return 1;
+    let outcome = await runProbe(paths, probe);
+    if (probe === PENDING && canOfferToken(paths, outcome)) {
+      const answer = await ask(TOKEN_PROMPT);
+      if (answer.trim().toLowerCase() === 'y') {
+        const issued = await runProbe(paths, ISSUE_TOKEN);
+        if (!issued.ok) return reportIncomplete(paths, ISSUE_TOKEN, issued);
+        reportIssued(issued.detail);
+        outcome = await runProbe(paths, probe);
+      }
     }
+    if (!outcome.ok) return reportIncomplete(paths, probe, outcome);
     console.log(`${probe.name}: ok (${outcome.detail})`);
   }
   console.log('\ninstall complete.');
@@ -392,7 +439,9 @@ function ask(question) {
       resolve(answer);
     });
     prompt.once('close', () => {
-      if (!answered) resolve('');
+      if (answered) return;
+      process.stdout.write('\n'); // the cursor is still on the prompt's line
+      resolve('');
     });
   });
 }
@@ -428,8 +477,7 @@ async function uninstall(paths, purge) {
   console.log(`Deleted ${paths.bridge} and ${paths.tools}.`);
   if (hadToken) {
     console.log(
-      'The T3 session behind the deleted token stays valid until it expires. To revoke it: ' +
-        '~/.t3/bin/t3 auth session list, then ~/.t3/bin/t3 auth session revoke <session-id>',
+      `The T3 session behind the deleted token stays valid until it expires. To revoke it: ${REVOKE_STEPS}`,
     );
   }
   return 0;

@@ -6,10 +6,16 @@ plists, starts RunAtLoad jobs from their ProgramArguments, and refuses a
 quarantined plist. So the probes go through the real bridge.py and the real
 tools, placed by the CLI, against a stub T3 server. The real launchd and the
 real home folder are never reached, and setUp checks that before anything runs.
+
+The token prompt depends on stdin being a terminal, so those tests give the CLI
+a real one through a pty instead of faking isTTY. That also covers what a fake
+cannot: readline's terminal mode, Ctrl-D and Ctrl-C, and the CLI exiting afterwards.
 """
 import json
 import os
 import plistlib
+import pty
+import select
 import shutil
 import signal
 import sqlite3
@@ -17,6 +23,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
+import types
 import unittest
 from pathlib import Path
 
@@ -27,9 +35,12 @@ CLI = REPO / "installer" / "t3-muse.js"
 NODE = subprocess.run(["node", "-p", "process.execPath"],
                       capture_output=True, text=True, check=True).stdout.strip()
 sys.path.insert(0, str(REPO / "tools"))
+import t3a  # noqa: E402  (what issue-token really asks for)
 import test_t3a  # noqa: E402  (for its stub T3 server)
 
 TOKEN = test_t3a.TOKEN
+TOKEN_PROMPT = "No t3a token found. Issue one now? [y/N]"
+PURGE_PROMPT = 'Type "purge" to confirm:'
 BRIDGE = "com.muse.t3bridge"
 RESTARTER = "com.muse.t3bridge-restarter"
 PACKAGED = {
@@ -123,7 +134,10 @@ else:
         print("com.apple.quarantine")
 """
 
-FAKE_T3_CLI = f"#!/bin/sh\necho '{TOKEN}'\n"
+FAKE_T3_CLI = f"""#!/bin/sh
+echo "$*" >> "$STUB_STATE/t3-calls"
+echo '{TOKEN}'
+"""
 
 # Lets the CLI run on Ubuntu with no test seam in its own code.
 PRELOAD = r"""
@@ -233,6 +247,46 @@ class InstallerCase(unittest.TestCase):
         self.assertNotIn(TOKEN, proc.output)
         return proc
 
+    def run_on_terminal(self, *args, answer=None, prompt=TOKEN_PROMPT):
+        """Run the CLI with a real terminal as stdin, stdout and stderr.
+
+        answer is typed once the prompt shows. A CLI that never exits, as one
+        left holding the terminal would, fails the test.
+        """
+        master, slave = pty.openpty()
+        self.addCleanup(os.close, master)
+        proc = subprocess.Popen([NODE, "--require", str(self.preload), str(CLI), *args],
+                                env=self.env, stdin=slave, stdout=slave, stderr=slave)
+        os.close(slave)
+        output = b""
+        deadline = time.monotonic() + 120
+        while True:
+            if time.monotonic() > deadline:
+                proc.kill()
+                proc.wait()
+                self.fail(f"the CLI did not exit: {output!r}")
+            if select.select([master], [], [], 0.2)[0]:
+                try:
+                    chunk = os.read(master, 4096)
+                except OSError:  # Linux, once the CLI has closed the terminal
+                    break
+                if not chunk:  # macOS, likewise
+                    break
+                output += chunk
+                if answer is not None and prompt.encode() in output:
+                    os.write(master, answer)
+                    answer = None
+            elif proc.poll() is not None:
+                break
+        proc.wait(timeout=30)
+        text = output.decode(errors="replace").replace("\r\n", "\n")
+        self.assertNotIn(TOKEN, text)
+        return types.SimpleNamespace(returncode=proc.returncode, output=text)
+
+    def t3_calls(self):
+        path = self.state / "t3-calls"
+        return path.read_text().splitlines() if path.exists() else []
+
     def install_ok(self, **kwargs):
         proc = self.run_cli("install", **kwargs)
         self.assertEqual(proc.returncode, 0, proc.output)
@@ -319,7 +373,15 @@ class Install(InstallerCase):
         self.assertEqual(restarter["ProgramArguments"], ["/bin/sh", f"{base}/restart-bridge.sh"])
         self.assertEqual(restarter["QueueDirectories"], [f"{base}/restart-trigger"])
 
-    def test_fresh_machine_stops_at_the_token_and_the_next_step_works(self):
+    def assert_stopped_at_the_token(self, output):
+        self.assertIn("t3a pending: FAILED: NO_TOKEN", output)
+        self.assertIn("python3 ~/t3-muse-tools/t3a.py issue-token", output)
+        self.assertNotIn("install complete", output)
+        self.assertNotIn("Issued a t3a token", output)
+        self.assertFalse(self.token_file.exists())
+        self.assertEqual(self.t3_calls(), [])
+
+    def test_no_terminal_is_not_asked_and_the_named_step_works(self):
         self.seed_t3(token=False)
         self.no_pending()
         self.agents.mkdir(parents=True)
@@ -329,14 +391,13 @@ class Install(InstallerCase):
         self.plist(RESTARTER).write_text("stale")
         (self.state / "quarantined").write_text(f"{self.plist(BRIDGE)}\n{self.plist(RESTARTER)}\n")
 
-        proc = self.run_cli("install")
+        # A piped y is not a person at a terminal: no prompt, and no token.
+        proc = self.run_cli("install", input="y\n")
         self.assertEqual(proc.returncode, 1, proc.output)
         self.assertIn("bridge-ping: ok (pong)", proc.stdout)
         self.assertIn("t3r health: ok", proc.stdout)
-        self.assertIn("t3a pending: FAILED: NO_TOKEN", proc.stderr)
-        self.assertIn("python3 ~/t3-muse-tools/t3a.py issue-token", proc.stderr)
-        self.assertNotIn("install complete", proc.stdout)
-        self.assertFalse(self.token_file.exists(), "install must not issue a token by itself")
+        self.assertNotIn(TOKEN_PROMPT, proc.output)
+        self.assert_stopped_at_the_token(proc.stderr)
 
         self.assert_placed()
         self.assert_plists_expanded()
@@ -362,6 +423,103 @@ class Install(InstallerCase):
         for folder in ("outbox", "done"):
             for path in (self.bridge / folder).iterdir():
                 self.assertNotIn(TOKEN, path.read_text(), path)
+
+    def test_terminal_yes_issues_the_token_and_install_passes(self):
+        self.seed_t3(token=False)
+        self.no_pending()
+
+        proc = self.run_on_terminal("install", answer=b"y\r")
+
+        self.assertEqual(proc.returncode, 0, proc.output)
+        self.assertIn(TOKEN_PROMPT, proc.output)
+        self.assertIn("t3a pending: ok (0 pending)", proc.output)
+        self.assertIn("install complete", proc.output)
+        self.assert_placed()
+
+        # The report matches what the tool really asked T3 for.
+        self.assertEqual(len(self.t3_calls()), 1)
+        issue_args = " ".join(t3a.ISSUE_ARGS)
+        self.assertEqual(self.t3_calls()[0], issue_args)
+        scopes = [t3a.ISSUE_ARGS[i + 1] for i, arg in enumerate(t3a.ISSUE_ARGS) if arg == "--scope"]
+        self.assertTrue(scopes)
+        for scope in scopes:
+            self.assertIn(scope, proc.output)
+        self.assertIn(f"--ttl {t3a.TOKEN_TTL_DAYS}d", issue_args)
+        self.assertIn(f"{t3a.TOKEN_TTL_DAYS} days", proc.output)
+        self.assertIn(str(self.token_file), proc.output)
+        self.assertIn("auth session revoke <session-id>", proc.output)
+
+        self.assertEqual(self.token_file.read_text().strip(), TOKEN)
+        self.assertEqual(self.token_file.stat().st_mode & 0o777, 0o600)
+        self.assertTrue(any(f"Bearer {TOKEN}" in shake for shake in self.server.handshakes))
+
+        # It went through the mailbox, with room for t3a to finish on its own,
+        # and only the file holds the token.
+        requests = [json.loads(path.read_text()) for path in (self.bridge / "done").iterdir()]
+        issuing = [r for r in requests if r.get("argv") == ["python3", "t3a.py", "issue-token"]]
+        self.assertEqual(len(issuing), 1)
+        self.assertGreater(issuing[0]["timeout"], t3a.CLI_TIMEOUT)
+        for folder in ("outbox", "done"):
+            for path in (self.bridge / folder).iterdir():
+                self.assertNotIn(TOKEN, path.read_text(), path)
+
+        # Now the file exists: nothing to ask, and nothing issued twice.
+        again = self.run_on_terminal("install")
+        self.assertEqual(again.returncode, 0, again.output)
+        self.assertNotIn(TOKEN_PROMPT, again.output)
+        self.assertEqual(len(self.t3_calls()), 1)
+
+    def test_terminal_capital_y_also_issues(self):
+        self.seed_t3(token=False)
+        self.no_pending()
+        proc = self.run_on_terminal("install", answer=b"Y\r")
+        self.assertEqual(proc.returncode, 0, proc.output)
+        self.assertEqual(len(self.t3_calls()), 1)
+
+    def test_terminal_anything_but_y_changes_nothing(self):
+        self.seed_t3(token=False)
+        self.no_pending()
+        for name, answer in (("n", b"n\r"), ("empty", b"\r"), ("yes", b"yes\r"),
+                             ("Ctrl-D", b"\x04"), ("Ctrl-C", b"\x03")):
+            with self.subTest(name):
+                proc = self.run_on_terminal("install", answer=answer)
+                self.assertEqual(proc.returncode, 1, proc.output)
+                self.assertIn(TOKEN_PROMPT, proc.output)
+                self.assert_stopped_at_the_token(proc.output)
+
+    def test_issued_token_is_still_reported_when_pending_then_fails(self):
+        self.seed_t3(token=False, server=False)
+        proc = self.run_on_terminal("install", answer=b"y\r")
+        self.assertEqual(proc.returncode, 1, proc.output)
+        self.assertIn("Issued a t3a token", proc.output)
+        self.assertIn("t3a pending: FAILED: T3_NOT_RUNNING", proc.output)
+        self.assertIn("Start T3 Code.", proc.output)
+        self.assertNotIn("install complete", proc.output)
+        self.assertTrue(self.token_file.exists())
+
+    def test_issue_that_fails_is_not_reported_as_issued(self):
+        self.seed_t3(token=False)
+        (self.home / ".t3" / "bin" / "t3").unlink()
+        proc = self.run_on_terminal("install", answer=b"y\r")
+        self.assertEqual(proc.returncode, 1, proc.output)
+        self.assertIn("t3a issue-token: FAILED: T3CLI_NOT_FOUND", proc.output)
+        self.assertNotIn("Issued a t3a token", proc.output)
+        self.assertNotIn("install complete", proc.output)
+        self.assertFalse(self.token_file.exists())
+
+    def test_unusable_token_file_is_not_asked_about(self):
+        # NO_TOKEN again, but there is a file, and issue-token will not replace it.
+        self.seed_t3(token=False)
+        self.tools.mkdir()
+        self.token_file.write_text("")
+        self.token_file.chmod(0o600)
+        proc = self.run_on_terminal("install")
+        self.assertEqual(proc.returncode, 1, proc.output)
+        self.assertNotIn(TOKEN_PROMPT, proc.output)
+        self.assertIn("does not hold a usable token", proc.output)
+        self.assertNotIn("Issue the t3a token once", proc.output)
+        self.assertEqual(self.token_file.read_text(), "")
+        self.assertEqual(self.t3_calls(), [])
 
     def test_install_again_restores_files_and_keeps_data(self):
         self.seed_t3()
@@ -415,12 +573,16 @@ class Install(InstallerCase):
     def test_rejected_token_is_reported_and_left_alone(self):
         self.seed_t3(server_status=401)
         before = self.token_file.read_bytes()
-        proc = self.run_cli("install")
-        self.assertEqual(proc.returncode, 1, proc.output)
-        self.assertIn("t3a pending: FAILED: TOKEN_REJECTED", proc.stderr)
-        self.assertIn("python3 ~/t3-muse-tools/t3a.py renew", proc.stderr)
-        self.assertEqual(self.token_file.read_bytes(), before)
-        self.assertEqual(sorted(p.name for p in self.tools.glob(".t3a-token*")), [".t3a-token"])
+        # Replacing a credential is heavier than one prompt: never asked, even
+        # at a terminal.
+        for proc in (self.run_cli("install"), self.run_on_terminal("install")):
+            self.assertEqual(proc.returncode, 1, proc.output)
+            self.assertNotIn(TOKEN_PROMPT, proc.output)
+            self.assertIn("t3a pending: FAILED: TOKEN_REJECTED", proc.output)
+            self.assertIn("python3 ~/t3-muse-tools/t3a.py renew", proc.output)
+            self.assertEqual(self.token_file.read_bytes(), before)
+            self.assertEqual(sorted(p.name for p in self.tools.glob(".t3a-token*")), [".t3a-token"])
+            self.assertEqual(self.t3_calls(), [])
 
     def test_load_that_fails_but_exits_zero(self):
         self.seed_t3()
@@ -561,6 +723,14 @@ class Uninstall(InstallerCase):
             self.assertTrue(self.token_file.exists(), answer)
             self.assertTrue(self.bridge.is_dir(), answer)
             self.assertEqual(self.launchctl_changes(), [], answer)
+
+    def test_purge_at_a_terminal(self):
+        proc = self.run_on_terminal("uninstall", "--purge", answer=b"\x04", prompt=PURGE_PROMPT)
+        self.assertEqual(proc.returncode, 1, proc.output)
+        self.assertTrue(self.bridge.is_dir())
+        proc = self.run_on_terminal("uninstall", "--purge", answer=b"purge\r", prompt=PURGE_PROMPT)
+        self.assertEqual(proc.returncode, 0, proc.output)
+        self.assertFalse(self.bridge.exists())
 
     def test_purge_confirmed(self):
         proc = self.run_cli("uninstall", "--purge", input="purge\n")

@@ -52,13 +52,17 @@ npx @mzkmnk-labs/t3-muse uninstall          # unload と plist の削除。デ�
 npx @mzkmnk-labs/t3-muse uninstall --purge  # 確認のうえ、2 つのデータフォルダも削除
 ```
 
-`npm install` の時点では何も動かず、変更はこれらのサブコマンドからだけ起きる。`install` が成功するのは、メールボックス経由の `bridge-ping`、`t3r health`、`t3a pending` がすべて通ったときだけなので、T3 Code が起動していて、承認用トークンがあることが前提になる。トークンは実際の権限を持つ資格情報なので、`install` は発行しない。新しいマシンの初回は、すべてを配置したあと `t3a pending` が `NO_TOKEN` で止まる。トークンを一度だけ発行して、もう一度 `install` を実行する:
+`npm install` の時点では何も動かず、変更はこれらのサブコマンドからだけ起きる。`install` が成功するのは、メールボックス経由の `bridge-ping`、`t3r health`、`t3a pending` がすべて通ったときだけなので、T3 Code が起動していて、承認用トークンがあることが前提になる。
+
+新しいマシンにはトークンファイルがまだない。ターミナルで実行すると、`install` は `No t3a token found. Issue one now? [y/N]` と尋ねる。`y` のときだけメールボックス経由の `t3a.py issue-token` で発行し、`t3a pending` をやり直す。発行した内容 (スコープと 90 日の有効期間)、ファイルの場所、失効の手順を出力するが、トークンの値は出力しない。
+
+それ以外の答えでは何も変わらない。CI やスクリプトなど、標準入力がターミナルでない実行でも何も変わらず、尋ねることもしない。どちらも `install` は終了コード 1 で終わるので、自分でトークンを発行して、もう一度 `install` を実行する:
 
 ```sh
 python3 ~/t3-muse-tools/t3a.py issue-token
 ```
 
-トークンが期限切れや失効の場合、`install` は `TOKEN_REJECTED` で止まり、トークンには触れない。`t3a.py renew` で置き換える。
+トークンが期限切れや失効の場合、`install` は `TOKEN_REJECTED` で止まり、トークンには触れない。既存の資格情報の差し替えは確認 1 回より重い操作なので、尋ねることもしない。`t3a.py renew` で置き換える。
 
 `install` の再実行は安全で、更新もこれで行う。配布ファイルは置き換えるが、トークンと監査用の履歴には触れない。inbox にリクエストが残っている間は、再起動で二重に実行されるため何も変更しない。手動の手順は `bridge/README.md` にある。
 

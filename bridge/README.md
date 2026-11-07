@@ -45,7 +45,9 @@ npx @mzkmnk-labs/t3-muse install
 macOS と `/usr/bin/python3` を確認し、フォルダの作成、ファイルの配置、plist の展開、隔離属性の除去、2 つの LaunchAgent の load までを行う。最後にメールボックス経由で `bridge-ping`、`t3r health`、`t3a pending` を実行し、3 つとも通ったときだけ成功とする。失敗しても配置したものは残るので、原因を直して同じコマンドをもう一度実行する。
 
 - `t3r health` には T3 Code の DB が、`t3a pending` には起動中の T3 Code と t3a トークンが要る
-- トークンは実際の権限を持つ資格情報なので、install は発行しない。新しいマシンの初回は `t3a pending` が `NO_TOKEN` で止まる。`python3 ~/t3-muse-tools/t3a.py issue-token` で一度だけ発行してから、もう一度 install を実行する。期限切れや失効で `TOKEN_REJECTED` になったときも install は自動で更新せず、`python3 ~/t3-muse-tools/t3a.py renew` を案内する
+- トークンファイルがないとき（新しいマシンの初回）は、ターミナルで実行していれば `No t3a token found. Issue one now? [y/N]` と尋ねる。`y` のときだけメールボックス経由の `t3a.py issue-token` で発行して `t3a pending` をやり直し、発行した内容（スコープと 90 日の有効期間）、ファイルの場所、失効の手順を出力する。トークンの値は出力しない
+- それ以外の答え、または CI やスクリプトなど標準入力がターミナルでない実行では何も変えず、`python3 ~/t3-muse-tools/t3a.py issue-token` を案内して終了コード 1 で終わる。発行してから、もう一度 install を実行する
+- 期限切れや失効の `TOKEN_REJECTED` では尋ねない。既存の資格情報の差し替えは確認 1 回より重い操作なので、`python3 ~/t3-muse-tools/t3a.py renew` を案内するだけにする。ファイルはあるのに中身が使えないときも尋ねず、`t3a.py` のメッセージに従う
 - 再実行は安全で、更新もこれで行う。配布ファイルは置き換えるが、`.t3a-token`、`done/`、`outbox/` には触れない
 - `inbox/` にリクエストが残っているときは、何も変更せずに止まる。再起動すると実行中のリクエストが二重に走り、止まっていたブリッジを起動すると溜まっていたリクエストが走るため
 

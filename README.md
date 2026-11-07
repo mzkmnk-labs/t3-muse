@@ -83,17 +83,25 @@ npx @mzkmnk-labs/t3-muse uninstall --purge  # also delete both data folders, onc
 Nothing runs on `npm install`; every change comes from one of these
 subcommands. `install` succeeds only when `bridge-ping`, `t3r health` and
 `t3a pending` all pass through the mailbox, so T3 Code must be running and
-the approval token must exist. `install` does not issue the token, because
-it is a credential with real authority. On a fresh machine the first run
-places everything and then stops at `t3a pending` with `NO_TOKEN`. Issue the
-token once and run `install` again:
+the approval token must exist.
+
+A fresh machine has no token file yet. On a terminal, `install` asks
+`No t3a token found. Issue one now? [y/N]`. Only `y` issues one, through
+`t3a.py issue-token` in the mailbox, and `t3a pending` then runs again. `install`
+prints what it issued (the scopes and the 90-day lifetime), where the file is
+and how to revoke it, and never the token itself.
+
+Any other answer changes nothing, and neither does a run without a terminal
+on stdin, such as CI or a script, which is never asked. In both cases `install`
+exits 1. Issue the token yourself and run `install` again:
 
 ```sh
 python3 ~/t3-muse-tools/t3a.py issue-token
 ```
 
 If the token has expired or been revoked, `install` stops with
-`TOKEN_REJECTED` and leaves it alone. Replace it with `t3a.py renew`.
+`TOKEN_REJECTED` and leaves it alone. It does not ask, because replacing a
+credential is a heavier step than one prompt. Replace it with `t3a.py renew`.
 
 Running `install` again is safe, and it is also how to update. It replaces
 the shipped files and leaves the token and the audit history alone. It
