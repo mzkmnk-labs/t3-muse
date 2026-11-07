@@ -8,32 +8,7 @@ actually needed.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    User["User"]
-    Muse["Muse"]
-    subgraph Mac["Mac Studio"]
-        Mailbox["File mailbox<br/>~/t3-tots-bridge<br/>inbox / outbox / done"]
-        Bridge["bridge.py<br/>launchd daemon, allowlist checks"]
-        Reader["t3r.py (read)<br/>~/t3-muse-tools"]
-        Writer["t3w.py (task requests)<br/>~/t3-muse-tools"]
-        T3CLI["t3 thread CLI<br/>bundled with T3 Code"]
-        DB[("T3 Code state DB<br/>~/.t3/userdata/statev2.sqlite")]
-        T3["T3 Code"]
-        Legacy["Existing t3-tots (for Grok)<br/>~/t3-tots"]
-    end
-    User -->|"requests, approvals"| Claude
-    Muse -->|"writes request JSON<br/>via the device channel"| Mailbox
-    Mailbox -->|"returns result JSON"| Claude
-    Bridge -->|"polls the inbox"| Mailbox
-    Bridge -->|"runs allowlisted commands only"| Reader
-    Bridge -->|"runs allowlisted commands only"| Writer
-    Reader -->|"opens read-only"| DB
-    Writer -->|"creates threads, sends prompts"| T3CLI
-    T3CLI -->|"local session"| T3
-    T3 -->|"reads and writes"| DB
-    Legacy -.->|"out of scope (do not touch)"| DB
-```
+![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Claude, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Claude. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py and t3w.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 thread CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch).](docs/architecture.svg)
 
 Key points:
 
