@@ -7,32 +7,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 
 ## 構成図
 
-```mermaid
-flowchart LR
-    User["ユーザー"]
-    Muse["Muse"]
-    subgraph Mac["Mac Studio"]
-        Mailbox["ファイルメールボックス<br/>~/t3-tots-bridge<br/>inbox / outbox / done"]
-        Bridge["bridge.py<br/>launchd 常駐・許可リスト検証"]
-        Reader["t3r.py (読み取り)<br/>~/t3-muse-tools"]
-        Writer["t3w.py (タスク依頼)<br/>~/t3-muse-tools"]
-        T3CLI["t3 thread CLI<br/>T3 Code 同梱"]
-        DB[("T3 Code 状態 DB<br/>~/.t3/userdata/statev2.sqlite")]
-        T3["T3 Code"]
-        Legacy["既存 t3-tots (Grok 用)<br/>~/t3-tots"]
-    end
-    User -->|"依頼・承認"| Claude
-    Muse -->|"デバイスチャネルで<br/>リクエスト JSON を書く"| Mailbox
-    Mailbox -->|"結果 JSON を返す"| Claude
-    Bridge -->|"inbox をポーリング"| Mailbox
-    Bridge -->|"許可したコマンドだけ実行"| Reader
-    Bridge -->|"許可したコマンドだけ実行"| Writer
-    Reader -->|"読み取り専用で開く"| DB
-    Writer -->|"スレッド作成・送信"| T3CLI
-    T3CLI -->|"ローカルセッション"| T3
-    T3 -->|"読み書き"| DB
-    Legacy -.->|"対象外 (触らない)"| DB
-```
+![構成図。Mac Studio の外では、ユーザーが Claude に依頼・承認を送り、Muse がデバイスチャネルでファイルメールボックスにリクエスト JSON を書く。Mac Studio の中では、メールボックスが Claude に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py と t3w.py に対して許可したコマンドだけ実行する。t3r.py は T3 Code 状態 DB を読み取り専用で開く。t3w.py は t3 thread CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。](docs/architecture.svg)
 
 要点:
 
