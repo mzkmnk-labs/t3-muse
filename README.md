@@ -8,19 +8,48 @@ actually needed.
 
 ## Architecture
 
-![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Muse, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch). Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, which restarts only the bridge job.](docs/architecture.svg)
+![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads and waits with t3_thread_wait, which Muse holds until the run is done and re-arms after a timeout. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch). Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
+
+The user talks to Muse, the product. Muse acts as PM and dispatches tasks
+to T3 Code over two paths.
+
+**Path 1: operations (default).** Muse → the custom connector
+`custom.t3code` → the T3 Connect relay → the environment's official MCP
+server (`/mcp`) → the T3 Code server. The relay uses HTTPS and OAuth
+(authorization code with dynamic registration), with a 30-day session and
+a mode cap. Starting, sending to, reading and listing threads go this way,
+and so does `t3_thread_wait`: to watch for completion, Muse holds the wait
+and re-arms it after a timeout.
+
+**Path 2: file mailbox bridge.** Muse → the file mailbox
+`~/t3-muse-bridge`, through the paired device → the bridge daemon (launchd,
+allowlist only), which runs:
+
+- `t3r.py`, which reads `statev2.sqlite` read-only.
+- `t3a.py`, which relays answers to approvals and questions. It relays only
+  what the user decided in chat, and approvals need `--user-approved`.
+- `t3w.py`, the fallback when the MCP is unavailable.
+
+A watchman, `restart-bridge.sh`, restarts the daemon when a file lands in
+`restart-trigger`.
+
+**Why two paths.** The official MCP's `t3_pending_request` only answers
+questions and cannot answer permission approvals, so `t3a.py` handles
+approvals. The MCP has no direct database access, so `t3r.py` handles that.
 
 Key points:
 
-- There is no path for the Mac to actively connect to Muse. Muse
-  places and fetches files through its device channel — a file mailbox.
+- On the mailbox path, the Mac has no way to actively connect to Muse.
+  Muse places and fetches the files through the paired device.
 - The bridge listens on no network port and runs nothing outside its
   allowlist (`bridge-ping`, the read-only `t3r.py` commands, the
   task-request `t3w.py` commands, and the answer-relay `t3a.py` commands).
-- Direct database access is read-only. Task requests to T3 go only
-  through T3 Code's own CLI (`t3w.py`), and only for requests the user
-  actually asked Muse to make. Answers to T3's pending approvals and
-  questions go only through `t3a.py`, and only when the user decided them.
+- Direct database access is read-only. Task requests to T3 go through the
+  official MCP by default and through T3 Code's own CLI (`t3w.py`) only
+  when the MCP is unavailable, in both cases only for requests the user
+  actually asked Muse to make. Permission approvals go only through
+  `t3a.py`. Answers to T3's pending approvals and questions are relayed
+  only when the user decided them.
 - The existing Grok-side t3-tots setup (`~/t3-tots`) runs on the same
   Mac but is out of scope for this project.
 - The bridge cannot restart itself, so a separate launchd job does it:
@@ -37,8 +66,8 @@ PAT instead.
 
 | Path | Contents |
 |---|---|
-| `bridge/` | The always-on Mac bridge. Receives requests through the file mailbox over Muse's device channel and runs allowlisted commands only (design notes in `bridge/README.md`) |
-| `tools/` | Our own Mac-side tools. `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `pending` / `answer`) |
+| `bridge/` | The always-on Mac bridge (path 2). Receives requests through the file mailbox via the paired device and runs allowlisted commands only (design notes in `bridge/README.md`) |
+| `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `pending` / `answer`) |
 
 ## Answering approvals and questions
 
