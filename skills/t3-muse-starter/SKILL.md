@@ -2,6 +2,18 @@
 
 Use this skill to set up t3-muse from scratch on a fresh machine and to run it day to day, with Muse as PM and T3 Code as the implementer.
 
+## Stay current
+
+- Treat this skill as a map rather than the territory. The repository code and its docs define the bridge side, and the live server discovery documents, the server tool list and your connector doc define the MCP side.
+
+- Follow those sources over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
+
+- Read the numbers and behaviors named here as observations from the build they were verified against. T3 Code ships as a fast moving Nightly, so re-check the cheap facts before relying on them, such as the tool schemas in the server tool list, the expiry printed when a token is issued, and how long a held request survives before the relay cuts it.
+
+- Expect the relay to cut a long held request at around two minutes with an HTTP 524, and design every wait to be re-armed rather than held once for a long stretch.
+
+- Update this skill in the same change whenever you fix a behavior it describes, and keep the copy in the repository in step with the copy Muse loads.
+
 ## Understand the shape
 
 - Treat t3-muse as a companion that lets Muse manage work in T3 Code on the user's Mac while T3 Code does the implementation.
@@ -42,7 +54,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Send a browser user agent header on every request from any hand written client. The relay sits behind Cloudflare and bans the default Python user agent signature with error 1010.
 
-- Give a hand written client a socket timeout of at least 480 seconds so a held wait is not cut short locally. Expect the relay edge to drop idle requests at around 100 seconds and design waits to be re-armed.
+- Give a hand written client a socket timeout comfortably above the longest single wait you plan to hold, so a held wait is not cut short locally.
 
 - Add tools to a client allowlist one at a time and only after reading the tool schema from the server tool list.
 
@@ -76,7 +88,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Answer approvals through t3a. An approve or deny answer requires the flag --user-approved at both the bridge validator and the tool, and it records that the human decided in chat.
 
-- Treat the MCP pending request respond action as covering user questions only. It cannot approve a permission request, so approvals always go through t3a.
+- Check the current tool description before relying on what the MCP pending request respond action can answer. In the build this skill was written against it covers user questions only and cannot approve a permission request, so approvals go through t3a.
 
 - Revoke the approval token from the Mac with the bundled T3 CLI session list and revoke commands when it expires or is no longer wanted. Reissue by revoking, deleting the token file and running issue-token again. The token lifetime is 90 days.
 
@@ -86,7 +98,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Have each run list the project threads through the MCP helper, compare them with a saved state file, and report only new completions, new failures and newly pending requests, with the pull request number and URL when present.
 
-- Have the run hold t3_thread_wait on one running thread with a timeout of 420000 ms after the comparison, fold a settled result into the same report, and treat a timeout as a normal end because the next run re-arms the wait.
+- Have the run hold t3_thread_wait on one running thread with a timeout of about 90000 ms after the comparison, fold a settled result into the same report, and treat a timeout or a relay error as a normal end because the next run re-arms the wait.
 
 - Fall back to the bridge thread list when the MCP read fails, and stay silent when both fail so a transient error never becomes a false report.
 
@@ -103,6 +115,8 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 - Re-approve the MCP connector grant when it expires at about 30 days and reissue the approval token before its 90 days run out.
 
 - Update docs/architecture.svg and both README files whenever the architecture changes. README.md is English and README.ja.md is Japanese.
+
+- Keep this skill truthful as the surfaces move. When a T3 Code or Muse update changes a behavior named here, ship the skill correction with the same pull request that adapts to it.
 
 - Keep personal paths and identifiers out of the repository. The plists keep the __HOME__ placeholder and expansion happens only at install time on the Mac.
 
