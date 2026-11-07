@@ -33,27 +33,66 @@ DEFAULT_TIMEOUT = 120
 MAX_OUTPUT = 200_000  # bytes per stream
 
 READER_SUBCOMMANDS = {"schema", "health", "status"}
-WRITER_SUBCOMMANDS = {"start", "send", "show", "list"}
+WRITER_SUBCOMMANDS = {"start", "send", "show", "list", "add-project"}
 ENV_WHITELIST = {"T3M_DB", "T3M_T3CLI"}
 THREAD_ID = re.compile(r"^[0-9a-fA-F-]{32,40}$")
+SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
 MAX_MESSAGE = 20_000
 
 
+def _validate_start(rest):
+    if len(rest) < 2:
+        return "t3w start needs a project and a message"
+    project, message = rest[0], rest[1]
+    if project.startswith("-") or message.startswith("-"):
+        return "t3w arguments must not start with -"
+    if len(project) > 500:
+        return "t3w start project argument too long"
+    if len(message) > MAX_MESSAGE:
+        return "t3w message too long"
+    tail = rest[2:]
+    i = 0
+    while i < len(tail):
+        token = tail[i]
+        if token == "--wait":
+            i += 1
+        elif token in ("--worktree", "--branch"):
+            if i + 1 >= len(tail) or not SAFE_REF.match(tail[i + 1]):
+                return f"t3w start {token} needs a safe ref value"
+            i += 2
+        else:
+            return f"t3w start argument not allowed: {token}"
+    return None
+
+
 def _validate_writer(rest, sub):
-    if sub in ("start", "send"):
+    if sub == "start":
+        return _validate_start(rest)
+    if sub == "send":
         if rest and rest[-1] == "--wait":
             rest = rest[:-1]
         if len(rest) != 2:
-            return f"t3w {sub} needs exactly two arguments"
+            return "t3w send needs exactly two arguments"
         target, message = rest
         if target.startswith("-") or message.startswith("-"):
             return "t3w arguments must not start with -"
-        if sub == "send" and not THREAD_ID.match(target):
+        if not THREAD_ID.match(target):
             return "t3w send needs a valid thread id"
-        if sub == "start" and len(target) > 500:
-            return "t3w start project argument too long"
         if len(message) > MAX_MESSAGE:
             return "t3w message too long"
+        return None
+    if sub == "add-project":
+        if len(rest) == 1:
+            path, title = rest[0], None
+        elif len(rest) == 3 and rest[1] == "--title":
+            path, title = rest[0], rest[2]
+        else:
+            return "t3w add-project needs a path and optional --title"
+        if not path.startswith("/") or len(path) > 500 or "\n" in path:
+            return "t3w add-project needs an absolute path"
+        if title is not None and (not title or len(title) > 200
+                                  or title.startswith("-")):
+            return "t3w add-project title not allowed"
         return None
     if sub == "show":
         if len(rest) != 1 or not THREAD_ID.match(rest[0]):

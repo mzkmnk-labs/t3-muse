@@ -114,6 +114,39 @@ def main() -> None:
                            argv=["python3", "t3w.py", "bogus"]))
         assert not r["ok"] and r["exit_code"] == 2, r
 
+        # worktree start passes the flags through; unsafe values rejected
+        r = roundtrip(dict(wreq, id="t-wworktree",
+                           argv=["python3", "t3w.py", "start",
+                                 "/some/project", "do the thing",
+                                 "--worktree", "main",
+                                 "--branch", "docs/rich-diagram"]))
+        assert r["ok"] and r["exit_code"] == 0, r
+        started = json.loads(r["stdout"])
+        assert "--worktree" in started["argv"], started
+        assert "docs/rich-diagram" in started["argv"], started
+        r = roundtrip(dict(wreq, id="t-wwtbad",
+                           argv=["python3", "t3w.py", "start",
+                                 "/some/project", "do the thing",
+                                 "--worktree", "--evil"]))
+        assert not r["ok"] and r["exit_code"] == 2, r
+        r = roundtrip(dict(wreq, id="t-wwtnoval",
+                           argv=["python3", "t3w.py", "start",
+                                 "/some/project", "do the thing",
+                                 "--branch"]))
+        assert not r["ok"] and r["exit_code"] == 2, r
+
+        # project registration passes through; relative paths rejected
+        r = roundtrip(dict(wreq, id="t-waddproj",
+                           argv=["python3", "t3w.py", "add-project",
+                                 "/some/project", "--title", "Demo"]))
+        assert r["ok"] and r["exit_code"] == 0, r
+        added = json.loads(r["stdout"])
+        assert added["argv"][:2] == ["project", "add"], added
+        r = roundtrip(dict(wreq, id="t-waddrel",
+                           argv=["python3", "t3w.py", "add-project",
+                                 "relative/path"]))
+        assert not r["ok"] and r["exit_code"] == 2, r
+
         print("bridge smoke test: OK")
     finally:
         proc.terminate()
