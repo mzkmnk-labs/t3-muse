@@ -8,7 +8,7 @@ actually needed.
 
 ## Architecture
 
-![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Claude, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Claude. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py and t3w.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 thread CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch).](docs/architecture.svg)
+![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Muse, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py and t3w.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 thread CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch).](docs/architecture.svg)
 
 Key points:
 

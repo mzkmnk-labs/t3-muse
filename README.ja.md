@@ -7,7 +7,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 
 ## 構成図
 
-![構成図。Mac Studio の外では、ユーザーが Claude に依頼・承認を送り、Muse がデバイスチャネルでファイルメールボックスにリクエスト JSON を書く。Mac Studio の中では、メールボックスが Claude に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py と t3w.py に対して許可したコマンドだけ実行する。t3r.py は T3 Code 状態 DB を読み取り専用で開く。t3w.py は t3 thread CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。](docs/architecture.svg)
+![構成図。Mac Studio の外では、ユーザーが Muse に依頼・承認を送り、Muse がデバイスチャネルでファイルメールボックスにリクエスト JSON を書く。Mac Studio の中では、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py と t3w.py に対して許可したコマンドだけ実行する。t3r.py は T3 Code 状態 DB を読み取り専用で開く。t3w.py は t3 thread CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。](docs/architecture.svg)
 
 要点:
 
