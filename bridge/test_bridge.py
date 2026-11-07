@@ -2,6 +2,8 @@
 """Smoke test for bridge.py: ping round-trip and allowlist rejection."""
 import json
 import os
+import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -41,6 +43,36 @@ def main() -> None:
 
         r = roundtrip({"id": "t-evil", "argv": ["rm", "-rf", "/"]})
         assert not r["ok"] and r["exit_code"] == 2, r
+
+        # the tools of the earlier design are no longer allowlisted
+        r = roundtrip({"id": "t-old", "argv": ["python3", "t3q.py", "health"]})
+        assert not r["ok"] and r["exit_code"] == 2, r
+
+        # our own reader, against a fixture database
+        tools_dir = home / "t3-muse-tools"
+        tools_dir.mkdir()
+        repo_root = Path(__file__).resolve().parent.parent
+        shutil.copy(repo_root / "tools" / "t3r.py", tools_dir / "t3r.py")
+        fixture = root / "fixture.sqlite"
+        con = sqlite3.connect(fixture)
+        con.execute("CREATE TABLE threads (id TEXT, title TEXT, status TEXT)")
+        con.execute("INSERT INTO threads VALUES ('1', 'hello', 'active')")
+        con.commit()
+        con.close()
+
+        req = {"argv": ["python3", "t3r.py", "health"],
+               "env": {"T3M_DB": str(fixture)}}
+        r = roundtrip(dict(req, id="t-health"))
+        assert r["ok"] and r["exit_code"] == 0, r
+        health = json.loads(r["stdout"])
+        assert health["table_count"] == 1 and health["exists"], health
+
+        r = roundtrip(dict(req, id="t-schema",
+                           argv=["python3", "t3r.py", "schema"]))
+        assert r["ok"] and r["exit_code"] == 0, r
+        schema = json.loads(r["stdout"])
+        assert schema["tables"][0]["name"] == "threads", schema
+        assert "title" in schema["tables"][0]["columns"], schema
 
         print("bridge smoke test: OK")
     finally:

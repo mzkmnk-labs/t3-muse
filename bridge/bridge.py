@@ -7,9 +7,8 @@ writes results to ~/t3-tots-bridge/outbox/<id>.json.
 
 Design rules:
 - No network listener. The only input is local files in the inbox folder.
-- Allowlist only: the built-in bridge-ping, t3q.py (read-only DB queries)
-  and t3ctl (which enforces its own token and user-approval rules).
-  No arbitrary shell, no other programs.
+- Allowlist only: the built-in bridge-ping and our own read-only
+  reader t3r.py (schema / health). No arbitrary shell, no other programs.
 - Every request and result is archived under done/ for audit.
 """
 import json
@@ -29,8 +28,8 @@ POLL_SECONDS = 0.5
 DEFAULT_TIMEOUT = 120
 MAX_OUTPUT = 200_000  # bytes per stream
 
-T3Q_SUBCOMMANDS = {"overview", "waiting", "thread", "projects", "health", "usage"}
-ENV_WHITELIST = {"T3_Q", "T3_DAYS", "T3_ALL", "T3_LAST", "T3_WEEK"}
+READER_SUBCOMMANDS = {"schema", "health"}
+ENV_WHITELIST = {"T3M_DB"}
 
 
 def validate(argv):
@@ -39,11 +38,9 @@ def validate(argv):
         return "argv must be a non-empty list of strings"
     if argv == ["bridge-ping"]:
         return None
-    if argv[0] == "python3" and len(argv) >= 3 and argv[1] == "t3q.py":
-        if argv[2] not in T3Q_SUBCOMMANDS:
-            return f"t3q.py subcommand not allowed: {argv[2]}"
-        return None
-    if argv[0] == "node" and len(argv) >= 2 and argv[1] == "t3ctl":
+    if argv[:2] == ["python3", "t3r.py"] and len(argv) == 3:
+        if argv[2] not in READER_SUBCOMMANDS:
+            return f"t3r.py subcommand not allowed: {argv[2]}"
         return None
     return "command not on the allowlist"
 
