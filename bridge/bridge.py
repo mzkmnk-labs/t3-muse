@@ -120,6 +120,7 @@ def process(path):
     if isinstance(req, dict) and req.get("id"):
         req_id = str(req["id"])
     result = run_request(req if isinstance(req, dict) else {})
+    result.setdefault("exit_code", 0 if result.get("ok") else 2)
     result["id"] = req_id
     result["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     write_result(req_id, result)

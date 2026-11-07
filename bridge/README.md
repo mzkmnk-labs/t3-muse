@@ -27,10 +27,14 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-tots-bri
 
 ## 導入
 
-1. Muse がデバイスチャネル経由で `~/t3-tots-bridge/`（bridge.py, inbox/, outbox/, done/）と `~/Library/LaunchAgents/com.muse.t3bridge.plist` を配置
-2. ユーザーがターミナルで1回だけ実行:
-   `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
-3. Muse が `bridge-ping` リクエストで疎通確認
+リポジトリ内の plist は個人パスを含まないよう `__HOME__` プレースホルダで書かれている。
+Mac 側でチェックアウト（ghq 管理なら worktree）から:
+
+1. `mkdir -p ~/t3-tots-bridge/inbox ~/t3-tots-bridge/outbox ~/t3-tots-bridge/done`
+2. `cp bridge/bridge.py ~/t3-tots-bridge/`
+3. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge.plist > ~/Library/LaunchAgents/com.muse.t3bridge.plist`
+4. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
+5. Muse が `bridge-ping` リクエストで疎通確認
 
 ## リクエスト形式
 
