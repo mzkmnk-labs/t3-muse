@@ -128,6 +128,10 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Expect t3r to fall back to an immutable read when T3 Code is stopped and the database refuses a plain read only open. It reports the open mode it used.
 
+- Read t3r status from the orchestration_v2 projection tables, and check its source field before trusting it. It says legacy when those tables are missing and status has fallen back to the old projection tables, which stopped updating in early October 2026 on the build this was verified against.
+
+- Read session_status in v2 output as the latest run status, or idle with no runs, the same values the MCP thread list reports. Expect subagent threads only when they have a pending request, even though the waiting counts always include them.
+
 - Never read the authentication tables or the scheduled task webhook secrets in the T3 database.
 
 ## Available connectors
