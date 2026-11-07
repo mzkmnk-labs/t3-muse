@@ -147,6 +147,106 @@ def main() -> None:
                                  "relative/path"]))
         assert not r["ok"] and r["exit_code"] == 2, r
 
+        # the answer relay: validators reject before anything runs
+        shutil.copy(repo_root / "tools" / "t3a.py", tools_dir / "t3a.py")
+        sentinel = "BRIDGE-TEST-TOKEN-sentinel"
+        fake_issue = root / "fake-issue-t3"
+        env_seen = root / "env-seen"
+        fake_issue.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os\n"
+            f"open({str(env_seen)!r}, 'w').write(os.environ.get('T3M_DB', ''))\n"
+            f"print({sentinel!r})\n")
+        fake_issue.chmod(0o755)
+        t3_home = root / "t3-home"
+        t3_home.mkdir()
+        aenv = {"T3M_T3CLI": str(fake_issue), "T3M_T3_HOME": str(t3_home)}
+        request_id = ("runtime-request:provider:codex:provider-turn:"
+                      "provider-turn%3Aabc:req_1")
+        rejected = [
+            ["answer", request_id, "approve"],
+            ["answer", request_id, "deny"],
+            ["answer", request_id, "--user-approved", "approve"],
+            ["answer", "--user-approved", request_id, "approve"],
+            ["answer", request_id, "plain text", "--user-approved"],
+            ["answer", request_id, "approve", "--user-approved", "extra"],
+            ["answer", request_id, "approve", "--force"],
+            ["answer", request_id],
+            ["answer"],
+            ["answer", "-x", "hello"],
+            ["answer", "bad id", "hello"],
+            ["answer", "trailing-newline\n", "hello"],
+            ["answer", request_id, ""],
+            ["answer", request_id, "   "],
+            ["answer", request_id, "-flag-like"],
+            ["answer", request_id, "  -flag-like"],
+            ["answer", request_id, "x" * 4001],
+            ["answer", request_id, "nul\x00byte"],
+            ["pending", "extra"],
+            ["issue-token", "--ttl", "1d"],
+            ["revoke-token"],
+        ]
+        for i, args in enumerate(rejected):
+            r = roundtrip(dict(env=aenv, id=f"t-areject-{i}",
+                               argv=["python3", "t3a.py", *args]))
+            assert not r["ok"] and r["exit_code"] == 2, (args, r)
+            assert "exit_code" in r and "stdout" not in r, (args, r)
+
+        # allowed shapes reach the tool, which reports it has no token yet
+        allowed = [
+            ["pending"],
+            ["answer", request_id, "approve", "--user-approved"],
+            ["answer", request_id, "deny", "--user-approved"],
+            ["answer", request_id, "use the blue one"],
+            ["answer", request_id, "x" * 4000],
+        ]
+        for i, args in enumerate(allowed):
+            r = roundtrip(dict(env=aenv, id=f"t-aallow-{i}",
+                               argv=["python3", "t3a.py", *args]))
+            assert r["ok"] and r["exit_code"] == 3, (args, r)
+            assert json.loads(r["stderr"])["error"] == "NO_TOKEN", (args, r)
+
+        # issue-token: the token reaches the file, never the mailbox
+        r = roundtrip({"id": "t-aissue",
+                       "env": dict(aenv, T3M_DB="not-for-t3a"),
+                       "argv": ["python3", "t3a.py", "issue-token"]})
+        assert r["ok"] and r["exit_code"] == 0, r
+        issued = json.loads(r["stdout"])
+        token_file = Path(issued["token_path"])
+        assert issued["issued"] is True, issued
+        assert token_file.resolve().parent == tools_dir.resolve(), issued
+        assert token_file.read_text().strip() == sentinel, issued
+        assert token_file.stat().st_mode & 0o777 == 0o600, issued
+        assert env_seen.read_text() == "", "T3M_DB must not reach t3a"
+        mailbox_files = [*base.joinpath("outbox").iterdir(),
+                         *base.joinpath("done").iterdir()]
+        assert mailbox_files, "the mailbox should hold results"
+        for path in mailbox_files:
+            assert sentinel not in path.read_text(), path
+        r = roundtrip({"id": "t-areissue", "env": aenv,
+                       "argv": ["python3", "t3a.py", "issue-token"]})
+        assert r["ok"] and r["exit_code"] == 3, r
+        assert json.loads(r["stderr"])["error"] == "TOKEN_EXISTS", r
+
+        # T3M_T3_HOME reaches t3a, and only t3a
+        r = roundtrip({"id": "t-ahome", "env": aenv,
+                       "argv": ["python3", "t3a.py", "pending"]})
+        assert r["ok"] and r["exit_code"] == 4, r
+        failure = json.loads(r["stderr"])
+        assert failure["error"] == "T3_NOT_RUNNING", r
+        assert str(t3_home) in failure["message"], r
+        fake_env = root / "fake-env-t3"
+        fake_env.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os\n"
+            "print(json.dumps({'home': os.environ.get('T3M_T3_HOME')}))\n")
+        fake_env.chmod(0o755)
+        r = roundtrip({"id": "t-wenv",
+                       "env": {"T3M_T3CLI": str(fake_env),
+                               "T3M_T3_HOME": "not-for-t3w"},
+                       "argv": ["python3", "t3w.py", "list"]})
+        assert r["ok"] and json.loads(r["stdout"])["home"] is None, r
+
         print("bridge smoke test: OK")
     finally:
         proc.terminate()

@@ -8,10 +8,11 @@ writes results to ~/t3-tots-bridge/outbox/<id>.json.
 Design rules:
 - No network listener. The only input is local files in the inbox folder.
 - Allowlist only: the built-in bridge-ping, our read-only reader
-  t3r.py (schema / health / status), and our task writer t3w.py
+  t3r.py (schema / health / status), our task writer t3w.py
   (start / send / show / list — the only write path, run solely for
-  requests the user asked Muse to make). No arbitrary shell,
-  no other programs.
+  requests the user asked Muse to make), and our answer relay t3a.py
+  (issue-token / pending / answer — only relays decisions the user made;
+  approvals need --user-approved). No arbitrary shell, no other programs.
 - Every request and result is archived under done/ for audit.
 """
 import json
@@ -38,6 +39,12 @@ ENV_WHITELIST = {"T3M_DB", "T3M_T3CLI"}
 THREAD_ID = re.compile(r"^[0-9a-fA-F-]{32,40}$")
 SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
 MAX_MESSAGE = 20_000
+T3A_SUBCOMMANDS_NO_ARGS = {"issue-token", "pending"}
+T3A_ENV_WHITELIST = {"T3M_T3CLI", "T3M_T3_HOME"}
+REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9:%_.~-]{0,799}")
+APPROVAL_RESPONSES = {"approve", "deny"}
+USER_APPROVED = "--user-approved"
+MAX_ANSWER = 4000
 
 
 def _validate_start(rest):
@@ -107,6 +114,34 @@ def _validate_writer(rest, sub):
     return f"t3w.py subcommand not allowed: {sub}"
 
 
+def _validate_t3a(rest, sub):
+    if sub in T3A_SUBCOMMANDS_NO_ARGS:
+        return f"t3a {sub} takes no arguments" if rest else None
+    if sub != "answer":
+        return f"t3a.py subcommand not allowed: {sub}"
+    user_approved = rest[-1:] == [USER_APPROVED]
+    if user_approved:
+        rest = rest[:-1]
+    if len(rest) != 2:
+        return "t3a answer needs a request id and a response"
+    request_id, response = rest
+    if not REQUEST_ID.fullmatch(request_id):
+        return "t3a answer needs a valid request id"
+    if response in APPROVAL_RESPONSES:
+        if not user_approved:
+            return f"t3a answer {response} needs {USER_APPROVED}"
+        return None
+    if user_approved:
+        return f"t3a answer {USER_APPROVED} only goes with approve or deny"
+    if not response.strip() or "\x00" in response:
+        return "t3a answer text is empty or invalid"
+    if len(response) > MAX_ANSWER:
+        return "t3a answer text too long"
+    if response.lstrip().startswith("-"):
+        return "t3a answer text must not start with -"
+    return None
+
+
 def validate(argv):
     """Return an error string, or None when the argv is allowed."""
     if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
@@ -119,6 +154,8 @@ def validate(argv):
         return None
     if argv[:2] == ["python3", "t3w.py"] and len(argv) >= 3:
         return _validate_writer(argv[3:], argv[2])
+    if argv[:2] == ["python3", "t3a.py"] and len(argv) >= 3:
+        return _validate_t3a(argv[3:], argv[2])
     return "command not on the allowlist"
 
 
@@ -143,9 +180,10 @@ def run_request(req):
         }
     env = dict(os.environ)
     req_env = req.get("env") or {}
+    allowed_env = T3A_ENV_WHITELIST if argv[1] == "t3a.py" else ENV_WHITELIST
     if isinstance(req_env, dict):
         for key, value in req_env.items():
-            if key in ENV_WHITELIST and isinstance(value, str):
+            if key in allowed_env and isinstance(value, str):
                 env[key] = value
     timeout = req.get("timeout", DEFAULT_TIMEOUT)
     if not isinstance(timeout, (int, float)) or not (1 <= timeout <= 600):
