@@ -17,15 +17,15 @@ Key points:
 - The bridge listens on no network port and runs nothing outside its
   allowlist (`bridge-ping`, the read-only `t3r.py` commands, and the
   task-request `t3w.py` commands).
-- The bridge cannot restart itself, so a separate launchd job does it:
-  a file dropped into `~/t3-muse-bridge/restart-trigger` runs
-  `restart-bridge.sh`, which restarts only the bridge job. The bridge
-  gains no `launchctl` rights.
 - Direct database access is read-only. Task requests to T3 go only
   through T3 Code's own CLI (`t3w.py`), and only for requests the user
   actually asked Muse to make.
 - The existing Grok-side t3-tots setup (`~/t3-tots`) runs on the same
   Mac but is out of scope for this project.
+- The bridge cannot restart itself, so a separate launchd job does it:
+  a file dropped into `~/t3-muse-bridge/restart-trigger` runs
+  `restart-bridge.sh`, which restarts only the bridge job. The bridge
+  gains no `launchctl` rights.
 
 Development flow: branch → pull request → CI (GitHub Actions) →
 squash merge. Files under `.github/workflows/` are the one exception:
@@ -36,7 +36,7 @@ PAT instead.
 
 | Path | Contents |
 |---|---|
-| `bridge/` | The always-on Mac bridge. Receives requests through the file mailbox over Muse's device channel and runs allowlisted commands only, plus a small launchd job that restarts it (design notes in `bridge/README.md`) |
+| `bridge/` | The always-on Mac bridge. Receives requests through the file mailbox over Muse's device channel and runs allowlisted commands only (design notes in `bridge/README.md`) |
 | `tools/` | Our own Mac-side tools. `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI (`start` / `send` / `show` / `list` / `add-project`) |
 
 ## How development proceeds
