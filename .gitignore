@@ -1,0 +1,2 @@
+# t3a.py session token, if the tool is ever run from a checkout
+tools/.t3a-token
