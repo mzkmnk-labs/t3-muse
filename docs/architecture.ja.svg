@@ -1,0 +1,320 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1254" width="1240" height="1254" role="img" aria-labelledby="title desc">
+  <title id="title">t3-muse 構成図</title>
+  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行い、t3_thread_wait で待機する。Muse は完了までこの待機を保持し、タイムアウトしたら張り直す。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で一度だけ発行したトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。Grok 用の既存 t3-tots は対象外。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .c { text-anchor: middle; }
+    .e { text-anchor: end; }
+    .t { font-size: 18px; font-weight: 700; }
+    .s { font-size: 15px; }
+    .p { font-size: 14px; }
+    .chip-label { font-size: 13.5px; }
+    .edge path { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .edge text { font-size: 15px; }
+    .dashed path { stroke-dasharray: 7 6; }
+
+    .card { fill: #f6f8fa; }
+    .mac rect { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+    .mac text { fill: #24292f; }
+
+    .ext .shape { fill: #fbefff; stroke: #8250df; stroke-width: 2; }
+    .ext text { fill: #512a97; }
+
+    .box .shape { fill: #fff8c5; stroke: #bf8700; stroke-width: 2; }
+    .box text { fill: #6c4400; }
+    .box .chip { fill: #ffffff; stroke: #d4a72c; stroke-width: 1; }
+
+    .group-muse rect { fill: #eef6ff; stroke: #80ccff; stroke-width: 1.5; }
+    .group-muse text { fill: #0a3069; }
+    .muse .shape { fill: #ffffff; stroke: #0969da; stroke-width: 2; }
+    .muse text { fill: #0a3069; }
+
+    .group-t3 rect { fill: #edf9f0; stroke: #6fdd8b; stroke-width: 1.5; }
+    .group-t3 text { fill: #044f1e; }
+    .t3 .shape { fill: #ffffff; stroke: #1a7f37; stroke-width: 2; }
+    .t3 .lid { fill: #d3f5dc; stroke: #1a7f37; stroke-width: 2; }
+    .t3 text { fill: #044f1e; }
+
+    .old .shape { fill: #f6f8fa; stroke: #6e7781; stroke-width: 2; stroke-dasharray: 7 6; }
+    .old text { fill: #424a53; }
+
+    .from-ext path { stroke: #8250df; }
+    .from-ext text { fill: #6639ba; }
+    .from-box path { stroke: #bf8700; }
+    .from-box text { fill: #7d4e00; }
+    .from-muse path { stroke: #0969da; }
+    .from-muse text { fill: #0550ae; }
+    .from-t3 path { stroke: #1a7f37; }
+    .from-t3 text { fill: #116329; }
+    .from-old path { stroke: #6e7781; }
+    .from-old text { fill: #57606a; }
+    .head-ext { fill: #8250df; }
+    .head-box { fill: #bf8700; }
+    .head-muse { fill: #0969da; }
+    .head-t3 { fill: #1a7f37; }
+    .head-old { fill: #6e7781; }
+
+    @media (prefers-color-scheme: dark) {
+      .card { fill: #0d1117; }
+      .mac rect { fill: #161b22; stroke: #6e7681; }
+      .mac text { fill: #f0f6fc; }
+
+      .ext .shape { fill: #271052; stroke: #a371f7; }
+      .ext text { fill: #e2c5ff; }
+
+      .box .shape { fill: #341a00; stroke: #d29922; }
+      .box text { fill: #f8e3a1; }
+      .box .chip { fill: #4b2900; stroke: #bb8009; }
+
+      .group-muse rect { fill: #0b1f3f; stroke: #1f6feb; }
+      .group-muse text { fill: #cae8ff; }
+      .muse .shape { fill: #0c2d6b; stroke: #58a6ff; }
+      .muse text { fill: #cae8ff; }
+
+      .group-t3 rect { fill: #0a2616; stroke: #238636; }
+      .group-t3 text { fill: #aff5b4; }
+      .t3 .shape { fill: #033a16; stroke: #3fb950; }
+      .t3 .lid { fill: #0f5323; stroke: #3fb950; }
+      .t3 text { fill: #aff5b4; }
+
+      .old .shape { fill: #21262d; stroke: #8b949e; }
+      .old text { fill: #c9d1d9; }
+
+      .from-ext path { stroke: #a371f7; }
+      .from-ext text { fill: #d2a8ff; }
+      .from-box path { stroke: #d29922; }
+      .from-box text { fill: #e3b341; }
+      .from-muse path { stroke: #58a6ff; }
+      .from-muse text { fill: #a5d6ff; }
+      .from-t3 path { stroke: #3fb950; }
+      .from-t3 text { fill: #7ee787; }
+      .from-old path { stroke: #8b949e; }
+      .from-old text { fill: #b1bac4; }
+      .head-ext { fill: #a371f7; }
+      .head-box { fill: #d29922; }
+      .head-muse { fill: #58a6ff; }
+      .head-t3 { fill: #3fb950; }
+      .head-old { fill: #8b949e; }
+    }
+  </style>
+
+  <defs>
+    <marker id="arrow-ext" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-ext" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
+    <marker id="arrow-box" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-box" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
+    <marker id="arrow-muse" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-muse" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
+    <marker id="arrow-t3" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-t3" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
+    <marker id="arrow-old" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-old" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
+  </defs>
+
+  <rect class="card" width="1240" height="1254" rx="16"/>
+
+  <!-- Boundaries -->
+  <g class="mac">
+    <rect x="16" y="296" width="1208" height="942" rx="18"/>
+    <text class="t" x="36" y="330">Mac Studio</text>
+  </g>
+  <g class="group-muse">
+    <rect x="218" y="496" width="682" height="390" rx="14"/>
+    <text x="241" y="519"><tspan class="s" font-weight="700">t3-muse</tspan><tspan class="s" dx="8">本リポジトリ</tspan></text>
+  </g>
+  <g class="group-t3">
+    <rect x="32" y="974" width="1176" height="250" rx="14"/>
+    <text x="962" y="998"><tspan class="s" font-weight="700">T3 Code</tspan><tspan class="s" dx="8">側</tspan></text>
+  </g>
+
+  <!-- Path captions -->
+  <g class="from-ext">
+    <text class="s e" font-weight="700" x="1080" y="128">経路1: 操作系 (既定)</text>
+    <text class="s e" font-weight="700" x="550" y="130">経路2: ファイルメールボックス・ブリッジ</text>
+  </g>
+
+  <!-- Edges: data-from and data-to use the node ids below; each arrow points at data-to -->
+  <g class="edge from-ext" data-from="User" data-to="Muse">
+    <path marker-end="url(#arrow-ext)" d="M190 60 H418"/>
+    <text class="c" x="304" y="50">チャットで依頼・承認</text>
+  </g>
+
+  <!-- Path 1 -->
+  <g class="edge from-ext" data-from="Muse" data-to="Connector">
+    <path marker-end="url(#arrow-ext)" d="M730 60 H968"/>
+    <text class="c" x="849" y="50">PM としてタスクを dispatch</text>
+  </g>
+  <g class="edge from-ext" data-from="Connector" data-to="Relay">
+    <path marker-end="url(#arrow-ext)" d="M1090 96 V148"/>
+    <text x="1100" y="128">HTTPS</text>
+  </g>
+  <g class="edge from-ext" data-from="Relay" data-to="MCP">
+    <path marker-end="url(#arrow-ext)" d="M950 274 V1006"/>
+    <text x="962" y="540">スレッドの起動・送信・</text>
+    <text x="962" y="559">読み取り・一覧</text>
+    <text x="962" y="660"><tspan class="mono">t3_thread_wait</tspan>: Muse が保持</text>
+    <text x="962" y="679">完了待ち、タイムアウトで張り直す</text>
+    <text x="962" y="780"><tspan class="mono">t3_pending_request</tspan> は</text>
+    <text x="962" y="799">質問への回答のみ、承認は不可</text>
+  </g>
+  <g class="edge from-t3" data-from="MCP" data-to="T3">
+    <path marker-end="url(#arrow-t3)" d="M1048 1092 V1138"/>
+    <text x="1058" y="1120">スレッド操作</text>
+  </g>
+
+  <!-- Path 2 -->
+  <g class="edge from-ext" data-from="Muse" data-to="Mailbox">
+    <path marker-end="url(#arrow-ext)" d="M660 96 V326"/>
+    <text x="670" y="205">ペアデバイス経由で</text>
+    <text x="670" y="224">リクエスト JSON を書く</text>
+  </g>
+  <g class="edge from-box" data-from="Mailbox" data-to="Muse">
+    <path marker-end="url(#arrow-box)" d="M560 328 V98"/>
+    <text class="e" x="550" y="220">結果 JSON を返す</text>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Mailbox">
+    <path marker-end="url(#arrow-muse)" d="M670 528 V426"/>
+    <text x="680" y="466">inbox をポーリング</text>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Reader">
+    <path marker-end="url(#arrow-muse)" d="M314 616 V694"/>
+    <text class="c" x="426" y="660">許可したコマンドだけ実行</text>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Answers">
+    <path marker-end="url(#arrow-muse)" d="M539 616 V694"/>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Writer">
+    <path marker-end="url(#arrow-muse)" d="M784 616 V694"/>
+    <text class="c" x="661" y="660">許可したコマンドだけ実行</text>
+  </g>
+  <g class="edge from-muse" data-from="Reader" data-to="DB">
+    <path marker-end="url(#arrow-muse)" d="M314 870 V1008"/>
+    <text x="324" y="935">読み取り専用で開く</text>
+  </g>
+  <g class="edge from-muse" data-from="Answers" data-to="T3">
+    <path marker-end="url(#arrow-muse)" d="M520 870 V1138"/>
+    <text x="530" y="925">ループバックの</text>
+    <text x="530" y="944">WebSocket</text>
+  </g>
+  <g class="edge from-muse" data-from="Answers" data-to="T3CLI">
+    <path marker-end="url(#arrow-muse)" d="M650 870 V1006"/>
+    <text x="660" y="935">トークンを一度発行</text>
+  </g>
+  <g class="edge dashed from-muse" data-from="Writer" data-to="T3CLI">
+    <path marker-end="url(#arrow-muse)" d="M815 870 V1006"/>
+    <text x="825" y="925">スレッド作成・</text>
+    <text x="825" y="944">プロンプト送信</text>
+  </g>
+  <g class="edge from-t3" data-from="T3CLI" data-to="T3">
+    <path marker-end="url(#arrow-t3)" d="M740 1092 V1138"/>
+    <text x="750" y="1120">ローカルセッション</text>
+  </g>
+  <g class="edge from-t3" data-from="T3" data-to="DB">
+    <path marker-end="url(#arrow-t3)" d="M500 1170 H374"/>
+    <text class="c" x="437" y="1160">読み書き</text>
+  </g>
+  <g class="edge dashed from-old" data-from="Legacy" data-to="DB">
+    <path marker-end="url(#arrow-old)" d="M104 808 V1008"/>
+    <text x="114" y="935">対象外 (触らない)</text>
+  </g>
+  <g class="edge from-box" data-from="Mailbox" data-to="Restarter">
+    <path marker-end="url(#arrow-box)" d="M480 386 H274"/>
+    <text class="c" x="377" y="376">restart-trigger が空でない</text>
+  </g>
+  <g class="edge from-muse" data-from="Restarter" data-to="Bridge">
+    <path marker-end="url(#arrow-muse)" d="M272 446 H600 V526"/>
+    <text class="c" x="377" y="436">このジョブだけ kickstart -k</text>
+  </g>
+
+  <!-- Outside the Mac -->
+  <g id="node-User" class="ext">
+    <rect class="shape" x="40" y="24" width="150" height="72" rx="36"/>
+    <text class="t c" x="115" y="66">ユーザー</text>
+  </g>
+  <g id="node-Muse" class="ext">
+    <rect class="shape" x="420" y="24" width="310" height="72" rx="36"/>
+    <text class="t c" x="575" y="66">Muse</text>
+  </g>
+  <g id="node-Connector" class="ext">
+    <rect class="shape" x="970" y="24" width="238" height="72" rx="36"/>
+    <text class="t mono c" x="1089" y="53">custom.t3code</text>
+    <text class="s c" x="1089" y="75">カスタムコネクタ</text>
+  </g>
+  <g id="node-Relay" class="ext">
+    <rect class="shape" x="860" y="150" width="348" height="124" rx="36"/>
+    <text class="c" x="1034" y="190"><tspan class="t">T3 Connect リレー</tspan></text>
+    <text class="p c" x="1034" y="216">OAuth 認可コード＋動的登録</text>
+    <text class="p c" x="1034" y="238">30 日セッション、モード上限あり</text>
+  </g>
+
+  <!-- Inside the Mac -->
+  <g id="node-Mailbox" class="box">
+    <rect class="shape" x="480" y="328" width="380" height="96" rx="14"/>
+    <text class="c" x="670" y="356"><tspan class="t">ファイルメールボックス</tspan></text>
+    <text class="p mono c" x="670" y="379">~/t3-muse-bridge</text>
+    <rect class="chip" x="494" y="389" width="136" height="24" rx="6"/>
+    <text class="chip-label mono c" x="562" y="406">restart-trigger</text>
+    <rect class="chip" x="638" y="389" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="670" y="406">inbox</text>
+    <rect class="chip" x="710" y="389" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="742" y="406">outbox</text>
+    <rect class="chip" x="782" y="389" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="814" y="406">done</text>
+  </g>
+  <g id="node-Bridge" class="muse">
+    <rect class="shape" x="290" y="528" width="520" height="88" rx="12"/>
+    <text class="t mono c" x="550" y="564">bridge.py</text>
+    <text class="s c" x="550" y="590">launchd 常駐・許可リスト検証</text>
+  </g>
+  <g id="node-Restarter" class="muse">
+    <rect class="shape" x="48" y="350" width="224" height="112" rx="12"/>
+    <text class="t mono c" x="160" y="387" style="font-size:17px">restart-bridge.sh</text>
+    <text class="s c" x="160" y="412">番人の launchd ジョブ、</text>
+    <text class="s c" x="160" y="432">ブリッジだけ再起動</text>
+  </g>
+  <g id="node-Reader" class="muse">
+    <rect class="shape" x="234" y="696" width="160" height="174" rx="12"/>
+    <text class="t mono c" x="314" y="732">t3r.py</text>
+    <text class="s c" x="314" y="768">読み取り専用で参照</text>
+    <text class="s c" x="314" y="789">MCP にない DB 参照</text>
+    <text class="p mono c" x="314" y="852">~/t3-muse-tools</text>
+  </g>
+  <g id="node-Answers" class="muse">
+    <rect class="shape" x="414" y="696" width="250" height="174" rx="12"/>
+    <text class="t mono c" x="539" y="732">t3a.py</text>
+    <text class="s c" x="539" y="768">ユーザーがチャットで決めた</text>
+    <text class="s c" x="539" y="789">回答だけを中継</text>
+    <text class="p c" x="539" y="822">承認は <tspan class="mono">--user-approved</tspan> 必須</text>
+    <text class="p mono c" x="539" y="852">~/t3-muse-tools</text>
+  </g>
+  <g id="node-Writer" class="muse">
+    <rect class="shape" x="684" y="696" width="200" height="174" rx="12"/>
+    <text class="t mono c" x="784" y="732">t3w.py</text>
+    <text class="s c" x="784" y="768">MCP が使えないときの</text>
+    <text class="s c" x="784" y="789">フォールバック</text>
+    <text class="p mono c" x="784" y="852">~/t3-muse-tools</text>
+  </g>
+  <g id="node-Legacy" class="old">
+    <rect class="shape" x="32" y="696" width="170" height="112" rx="12"/>
+    <text class="t c" x="117" y="730" style="font-size:16.5px">既存 t3-tots</text>
+    <text class="s c" x="117" y="752">(Grok 用)</text>
+    <text class="p mono c" x="117" y="785">~/t3-tots</text>
+  </g>
+  <g id="node-DB" class="t3">
+    <path class="shape" d="M48 1020 A162 13 0 0 1 372 1020 V1198 A162 13 0 0 1 48 1198 Z"/>
+    <ellipse class="lid" cx="210" cy="1020" rx="162" ry="13"/>
+    <text class="t c" x="210" y="1102">T3 Code 状態 DB</text>
+    <text class="p mono c" x="210" y="1128">~/.t3/userdata/statev2.sqlite</text>
+  </g>
+  <g id="node-T3CLI" class="t3">
+    <rect class="shape" x="620" y="1008" width="240" height="84" rx="12"/>
+    <text class="t mono c" x="740" y="1043" style="font-size:17px">t3 CLI</text>
+    <text class="s c" x="740" y="1067">T3 Code 同梱</text>
+  </g>
+  <g id="node-MCP" class="t3">
+    <rect class="shape" x="900" y="1008" width="296" height="84" rx="12"/>
+    <text class="c" x="1048" y="1043"><tspan class="t">公式 MCP サーバー</tspan><tspan class="p mono" dx="10">/mcp</tspan></text>
+    <text class="s c" x="1048" y="1067">環境上で稼働</text>
+  </g>
+  <g id="node-T3" class="t3">
+    <rect class="shape" x="500" y="1140" width="696" height="60" rx="12"/>
+    <text class="c" x="848" y="1176"><tspan class="t">T3 Code サーバー</tspan></text>
+  </g>
+</svg>

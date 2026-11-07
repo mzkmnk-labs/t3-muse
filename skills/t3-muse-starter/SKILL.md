@@ -114,7 +114,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Re-approve the MCP connector grant when it expires at about 30 days and reissue the approval token before its 90 days run out.
 
-- Update docs/architecture.svg and both README files whenever the architecture changes. README.md is English and README.ja.md is Japanese.
+- Update docs/architecture.svg, docs/architecture.ja.svg and both README files whenever the architecture changes. README.md and docs/architecture.svg are English, and README.ja.md and docs/architecture.ja.svg are Japanese.
 
 - Keep this skill truthful as the surfaces move. When a T3 Code or Muse update changes a behavior named here, ship the skill correction with the same pull request that adapts to it.
 
