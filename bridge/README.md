@@ -34,21 +34,49 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-muse-bri
 
 ## 導入
 
-リポジトリ内の plist は個人パスを含まないよう `__HOME__` プレースホルダで書かれている。
+### 自動
+
+Mac のターミナルで実行する。`npm install` の時点では何も動かず、変更は明示したサブコマンドからだけ起きる:
+
+```sh
+npx @mzkmnk-labs/t3-muse install
+```
+
+macOS と `/usr/bin/python3` を確認し、フォルダの作成、ファイルの配置、plist の展開、隔離属性の除去、2 つの LaunchAgent の load までを行う。最後にメールボックス経由で `bridge-ping`、`t3r health`、`t3a pending` を実行し、3 つとも通ったときだけ成功とする。失敗しても配置したものは残るので、原因を直して同じコマンドをもう一度実行する。
+
+- `t3r health` には T3 Code の DB が、`t3a pending` には起動中の T3 Code と t3a トークンが要る
+- トークンファイルがないとき（新しいマシンの初回）は、ターミナルで実行していれば `No t3a token found. Issue one now? [y/N]` と尋ねる。`y` のときだけメールボックス経由の `t3a.py issue-token` で発行して `t3a pending` をやり直し、発行した内容（スコープと 90 日の有効期間）、ファイルの場所、失効の手順を出力する。トークンの値は出力しない
+- それ以外の答え、または CI やスクリプトなど標準入力がターミナルでない実行では何も変えず、`python3 ~/t3-muse-tools/t3a.py issue-token` を案内して終了コード 1 で終わる。発行してから、もう一度 install を実行する
+- 期限切れや失効の `TOKEN_REJECTED` では尋ねない。既存の資格情報の差し替えは確認 1 回より重い操作なので、`python3 ~/t3-muse-tools/t3a.py renew` を案内するだけにする。ファイルはあるのに中身が使えないときも尋ねず、`t3a.py` のメッセージに従う
+- 再実行は安全で、更新もこれで行う。配布ファイルは置き換えるが、`.t3a-token`、`done/`、`outbox/` には触れない
+- `inbox/` にリクエストが残っているときは、何も変更せずに止まる。再起動すると実行中のリクエストが二重に走り、止まっていたブリッジを起動すると溜まっていたリクエストが走るため
+
+ほかのサブコマンド:
+
+- `npx @mzkmnk-labs/t3-muse status`: デーモンのロード状態、`bridge-ping` の応答、ファイルの有無を報告する。トークンは有無だけで中身は出さない。すべて揃っていれば終了コード 0、欠けがあれば 1。書き込むのは `bridge-ping` のリクエスト 1 件だけで、デーモンが止まっているときは送らない
+- `npx @mzkmnk-labs/t3-muse uninstall`: 2 つの LaunchAgent を unload して plist を削除する。データフォルダは残す
+- `npx @mzkmnk-labs/t3-muse uninstall --purge`: 確認の入力を求めたうえで、`~/t3-muse-bridge` と `~/t3-muse-tools` も削除する。トークンのファイルを消しても T3 側のセッションは期限まで有効なので、必要なら `t3 auth session revoke` で失効させる
+
+### 手動
+
+自動の方法が使えないときの手順。リポジトリ内の plist は個人パスを含まないよう `__HOME__` プレースホルダで書かれている。
 Mac 側でチェックアウト（ghq 管理なら worktree）から:
 
-1. `mkdir -p ~/t3-muse-bridge/inbox ~/t3-muse-bridge/outbox ~/t3-muse-bridge/done`
+1. `mkdir -p ~/t3-muse-bridge/inbox ~/t3-muse-bridge/outbox ~/t3-muse-bridge/done ~/t3-muse-tools ~/Library/LaunchAgents`
 2. `cp bridge/bridge.py ~/t3-muse-bridge/`
-3. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge.plist > ~/Library/LaunchAgents/com.muse.t3bridge.plist`
-4. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
-5. Muse が `bridge-ping` リクエストで疎通確認
+3. `cp tools/t3r.py tools/t3w.py tools/t3a.py ~/t3-muse-tools/`
+4. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge.plist > ~/Library/LaunchAgents/com.muse.t3bridge.plist`
+5. plist をファイル転送で受け取った場合は `xattr -d com.apple.quarantine ~/Library/LaunchAgents/com.muse.t3bridge.plist` で隔離属性を外す。launchd は隔離属性付きの plist を `Load failed: 5` で拒否する
+6. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
+7. Muse が `bridge-ping` リクエストで疎通確認
 
 続けて再起動ジョブを入れる。`launchctl load` が必要なのはこの 1 回だけ:
 
 1. `mkdir -p ~/t3-muse-bridge/restart-trigger`
 2. `cp bridge/restart-bridge.sh ~/t3-muse-bridge/ && chmod +x ~/t3-muse-bridge/restart-bridge.sh`
 3. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge-restarter.plist > ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`
-4. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`
+4. 同じくファイル転送で受け取った場合は `xattr -d com.apple.quarantine ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`
+5. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`
 
 ## ブリッジの再起動 (Restarting the bridge)
 

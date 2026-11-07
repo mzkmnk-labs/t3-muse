@@ -37,6 +37,7 @@ class SurfaceAreaTests(unittest.TestCase):
             ("bridge/README.md", "bridge/"),
             ("bridge/com.muse.t3bridge.plist", "bridge/"),
             ("tools/t3w.py", "tools/"),
+            ("installer/t3-muse.js", "installer/"),
             ("docs/architecture.svg", "docs/"),
             ("README.md", "README.md"),
             ("README.ja.md", "README.ja.md"),

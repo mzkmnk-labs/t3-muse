@@ -68,7 +68,45 @@ PAT instead.
 |---|---|
 | `bridge/` | The always-on Mac bridge (path 2). Receives requests through the file mailbox via the paired device and runs allowlisted commands only (design notes in `bridge/README.md`) |
 | `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `renew` / `pending` / `answer`) |
+| `installer/`, `package.json` | The npm package `@mzkmnk-labs/t3-muse`: a Node CLI with no dependencies that installs the bridge and tools on the Mac (`install` / `status` / `uninstall`) |
 | `skills/t3-muse-starter/` | A custom Muse skill for setting up t3-muse from scratch and running it day to day, with Muse as PM and T3 Code as the implementer |
+
+## Installing on the Mac
+
+```sh
+npx @mzkmnk-labs/t3-muse install            # place the files, load both LaunchAgents, verify
+npx @mzkmnk-labs/t3-muse status             # report the state; never shows the token
+npx @mzkmnk-labs/t3-muse uninstall          # unload and delete the plists; keeps the data
+npx @mzkmnk-labs/t3-muse uninstall --purge  # also delete both data folders, once you confirm
+```
+
+Nothing runs on `npm install`; every change comes from one of these
+subcommands. `install` succeeds only when `bridge-ping`, `t3r health` and
+`t3a pending` all pass through the mailbox, so T3 Code must be running and
+the approval token must exist.
+
+A fresh machine has no token file yet. On a terminal, `install` asks
+`No t3a token found. Issue one now? [y/N]`. Only `y` issues one, through
+`t3a.py issue-token` in the mailbox, and `t3a pending` then runs again. `install`
+prints what it issued (the scopes and the 90-day lifetime), where the file is
+and how to revoke it, and never the token itself.
+
+Any other answer changes nothing, and neither does a run without a terminal
+on stdin, such as CI or a script, which is never asked. In both cases `install`
+exits 1. Issue the token yourself and run `install` again:
+
+```sh
+python3 ~/t3-muse-tools/t3a.py issue-token
+```
+
+If the token has expired or been revoked, `install` stops with
+`TOKEN_REJECTED` and leaves it alone. It does not ask, because replacing a
+credential is a heavier step than one prompt. Replace it with `t3a.py renew`.
+
+Running `install` again is safe, and it is also how to update. It replaces
+the shipped files and leaves the token and the audit history alone. It
+changes nothing while requests are waiting in the inbox, because restarting
+the bridge would run them twice. For the manual steps, see `bridge/README.md`.
 
 ## Answering approvals and questions
 

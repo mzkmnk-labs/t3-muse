@@ -29,7 +29,8 @@ bridge's design and security notes, see `bridge/README.md`.
   `docs/architecture.ja.svg`, `README.md` and `README.ja.md`. Keep the two SVGs
   structurally identical, with only the labels in each language.
 - When you change anything `skills/t3-muse-starter/SKILL.md` describes
-  (`bridge/`, `tools/`, `docs/`, the READMEs), update the skill in the same PR.
+  (`bridge/`, `tools/`, `installer/`, `docs/`, the READMEs), update the skill in
+  the same PR.
 - Write `README.md` in English and `README.ja.md` in Japanese, and keep their
   content in sync.
 

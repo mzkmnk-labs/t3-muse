@@ -28,6 +28,8 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 ## Set up the bridge on the Mac
 
+- Ask the user to run npx @mzkmnk-labs/t3-muse install in a Mac terminal as the automated way to do the steps in this section, and keep the manual steps below as the fallback. On a machine with no token file it asks whether to issue the t3a token, and that answer is the user's to give. If they decline, or it runs without a terminal, it stops at t3a pending with NO_TOKEN until t3a issue-token has run and install is run again. A TOKEN_REJECTED is never asked about, so replace that token with t3a renew.
+
 - Clone the t3-muse repository and read its README and bridge README before placing any files.
 
 - Create the folder ~/t3-muse-bridge with inbox, outbox, done and restart-trigger inside it, plus the folder ~/t3-muse-tools.

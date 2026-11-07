@@ -40,7 +40,31 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 |---|---|
 | `bridge/` | Mac 常駐ブリッジ (経路2)。ペアデバイス経由のファイルメールボックスで、許可リストのコマンドだけを実行する (設計は `bridge/README.md`) |
 | `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `renew` / `pending` / `answer`) |
+| `installer/`、`package.json` | npm パッケージ `@mzkmnk-labs/t3-muse`。ブリッジとツールを Mac に導入する、依存パッケージなしの Node CLI (`install` / `status` / `uninstall`) |
 | `skills/t3-muse-starter/` | t3-muse をまっさらな状態からセットアップして日々運用するための Muse 用カスタム skill。Muse が PM、T3 Code が実装を担当する |
+
+## Mac への導入
+
+```sh
+npx @mzkmnk-labs/t3-muse install            # ファイルの配置、2 つの LaunchAgent の load、動作確認
+npx @mzkmnk-labs/t3-muse status             # 状態の報告。トークンの中身は出さない
+npx @mzkmnk-labs/t3-muse uninstall          # unload と plist の削除。データは残す
+npx @mzkmnk-labs/t3-muse uninstall --purge  # 確認のうえ、2 つのデータフォルダも削除
+```
+
+`npm install` の時点では何も動かず、変更はこれらのサブコマンドからだけ起きる。`install` が成功するのは、メールボックス経由の `bridge-ping`、`t3r health`、`t3a pending` がすべて通ったときだけなので、T3 Code が起動していて、承認用トークンがあることが前提になる。
+
+新しいマシンにはトークンファイルがまだない。ターミナルで実行すると、`install` は `No t3a token found. Issue one now? [y/N]` と尋ねる。`y` のときだけメールボックス経由の `t3a.py issue-token` で発行し、`t3a pending` をやり直す。発行した内容 (スコープと 90 日の有効期間)、ファイルの場所、失効の手順を出力するが、トークンの値は出力しない。
+
+それ以外の答えでは何も変わらない。CI やスクリプトなど、標準入力がターミナルでない実行でも何も変わらず、尋ねることもしない。どちらも `install` は終了コード 1 で終わるので、自分でトークンを発行して、もう一度 `install` を実行する:
+
+```sh
+python3 ~/t3-muse-tools/t3a.py issue-token
+```
+
+トークンが期限切れや失効の場合、`install` は `TOKEN_REJECTED` で止まり、トークンには触れない。既存の資格情報の差し替えは確認 1 回より重い操作なので、尋ねることもしない。`t3a.py renew` で置き換える。
+
+`install` の再実行は安全で、更新もこれで行う。配布ファイルは置き換えるが、トークンと監査用の履歴には触れない。inbox にリクエストが残っている間は、再起動で二重に実行されるため何も変更しない。手動の手順は `bridge/README.md` にある。
 
 ## 承認と質問への回答
 

@@ -38,6 +38,7 @@ AUDITED_COMMANDS = ("git commit", "gh pr create")
 SKILL_SURFACE = (
     "bridge/",  # mailbox daemon, restarter, LaunchAgent plists
     "tools/",  # t3r, t3w, t3a
+    "installer/",  # the npx install command
     "docs/",  # architecture diagram
     "README.md",  # setup and operation, English
     "README.ja.md",  # setup and operation, Japanese
