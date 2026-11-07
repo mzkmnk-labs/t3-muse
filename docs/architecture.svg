@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 950" width="1160" height="950" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse architecture / t3-muse 構成図</title>
-  <desc id="desc">User sends requests and approvals to Muse. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope.</desc>
+  <desc id="desc">User sends requests and approvals to Muse. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, which restarts only the bridge job.</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -199,6 +199,16 @@
     <text x="114" y="712">out of scope (do not touch)</text>
     <text x="114" y="733">対象外 (触らない)</text>
   </g>
+  <g class="edge from-box" data-from="Mailbox" data-to="Restarter">
+    <path marker-end="url(#arrow-box)" d="M493 262 H274"/>
+    <text class="c" x="383" y="252">restart-trigger not empty</text>
+    <text class="c" x="383" y="283">restart-trigger が空でない</text>
+  </g>
+  <g class="edge from-muse" data-from="Restarter" data-to="Bridge">
+    <path marker-end="url(#arrow-muse)" d="M272 322 H620 V402"/>
+    <text class="c" x="383" y="312">kickstart -k, this job only</text>
+    <text class="c" x="383" y="343">このジョブだけ再起動</text>
+  </g>
 
   <!-- Outside the Mac -->
   <g id="node-User" class="ext">
@@ -216,12 +226,14 @@
     <rect class="shape" x="493" y="204" width="380" height="96" rx="14"/>
     <text class="c" x="683" y="232"><tspan class="t">File mailbox</tspan><tspan class="s" dx="10">ファイルメールボックス</tspan></text>
     <text class="p mono c" x="683" y="255">~/t3-muse-bridge</text>
-    <rect class="chip" x="556" y="265" width="78" height="24" rx="6"/>
-    <text class="chip-label mono c" x="595" y="282">inbox</text>
-    <rect class="chip" x="644" y="265" width="78" height="24" rx="6"/>
-    <text class="chip-label mono c" x="683" y="282">outbox</text>
-    <rect class="chip" x="732" y="265" width="78" height="24" rx="6"/>
-    <text class="chip-label mono c" x="771" y="282">done</text>
+    <rect class="chip" x="507" y="265" width="136" height="24" rx="6"/>
+    <text class="chip-label mono c" x="575" y="282">restart-trigger</text>
+    <rect class="chip" x="651" y="265" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="683" y="282">inbox</text>
+    <rect class="chip" x="723" y="265" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="755" y="282">outbox</text>
+    <rect class="chip" x="795" y="265" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="827" y="282">done</text>
   </g>
   <g id="node-Bridge" class="muse">
     <rect class="shape" x="565" y="404" width="236" height="112" rx="12"/>
@@ -229,6 +241,13 @@
     <text class="s c" x="683" y="453">launchd daemon,</text>
     <text class="s c" x="683" y="472">allowlist checks</text>
     <text class="s c" x="683" y="498">launchd 常駐・許可リスト検証</text>
+  </g>
+  <g id="node-Restarter" class="muse">
+    <rect class="shape" x="48" y="226" width="224" height="112" rx="12"/>
+    <text class="t mono c" x="160" y="253" style="font-size:17px">restart-bridge.sh</text>
+    <text class="s c" x="160" y="275">launchd job,</text>
+    <text class="s c" x="160" y="294">restarts the bridge only</text>
+    <text class="s c" x="160" y="320">ブリッジだけ再起動</text>
   </g>
   <g id="node-Reader" class="muse">
     <rect class="shape" x="261" y="404" width="160" height="112" rx="12"/>

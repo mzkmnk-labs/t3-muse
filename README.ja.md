@@ -7,7 +7,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 
 ## 構成図
 
-![構成図。Mac Studio の外では、ユーザーが Muse に依頼・承認を送り、Muse がデバイスチャネルでファイルメールボックスにリクエスト JSON を書く。Mac Studio の中では、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py、t3w.py、t3a.py に対して許可したコマンドだけ実行する。t3r.py は T3 Code 状態 DB を読み取り専用で開く。t3w.py は t3 CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。t3a.py は T3 Code の承認待ち・質問待ちへのユーザーの回答を、t3 CLI で一度だけ発行したトークンを使ってループバックの WebSocket で中継する。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。](docs/architecture.svg)
+![構成図。Mac Studio の外では、ユーザーが Muse に依頼・承認を送り、Muse がデバイスチャネルでファイルメールボックスにリクエスト JSON を書く。Mac Studio の中では、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py、t3w.py、t3a.py に対して許可したコマンドだけ実行する。t3r.py は T3 Code 状態 DB を読み取り専用で開く。t3w.py は t3 CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。t3a.py は T3 Code の承認待ち・質問待ちへのユーザーの回答を、t3 CLI で一度だけ発行したトークンを使ってループバックの WebSocket で中継する。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。別に、メールボックスの restart-trigger に置いたファイルで launchd が restart-bridge.sh を起動し、ブリッジのジョブだけを再起動する。](docs/architecture.svg)
 
 要点:
 
@@ -15,6 +15,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 - ブリッジはネットワークを待ち受けず、許可リスト (`bridge-ping`、`t3r.py` の読み取り系、`t3w.py` のタスク依頼系、`t3a.py` の回答中継系) 以外は実行しない
 - DB への直接アクセスは読み取り専用のみ。T3 への作業依頼は T3 純正 CLI 経由 (`t3w.py`) だけで、ユーザーの依頼に基づく場合に限る。T3 の承認待ち・質問待ちへの回答は `t3a.py` だけで、ユーザーが決めた場合に限る
 - 既存の Grok 用 t3-tots 環境 (`~/t3-tots`) は同じ Mac で稼働しているが、本プロジェクトの対象外
+- ブリッジは自分自身を再起動できないため、別の launchd ジョブが担当する。`~/t3-muse-bridge/restart-trigger` にファイルを置くと `restart-bridge.sh` が動き、ブリッジのジョブだけを再起動する。ブリッジ本体に `launchctl` の権限は増えない
 
 開発フロー: 変更はブランチ → PR → CI (GitHub Actions) → squash マージ。
 `.github/workflows/` のファイルだけは Muse の GitHub App の権限外のため、専用 PAT 経由で push する。

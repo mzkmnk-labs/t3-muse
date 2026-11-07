@@ -8,7 +8,7 @@ actually needed.
 
 ## Architecture
 
-![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Muse, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch).](docs/architecture.svg)
+![Architecture diagram. Outside the Mac Studio, the user sends requests and approvals to Muse, and Muse writes request JSON to the file mailbox via the device channel. Inside the Mac Studio, the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only. t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch). Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, which restarts only the bridge job.](docs/architecture.svg)
 
 Key points:
 
@@ -23,6 +23,10 @@ Key points:
   questions go only through `t3a.py`, and only when the user decided them.
 - The existing Grok-side t3-tots setup (`~/t3-tots`) runs on the same
   Mac but is out of scope for this project.
+- The bridge cannot restart itself, so a separate launchd job does it:
+  a file dropped into `~/t3-muse-bridge/restart-trigger` runs
+  `restart-bridge.sh`, which restarts only the bridge job. The bridge
+  gains no `launchctl` rights.
 
 Development flow: branch → pull request → CI (GitHub Actions) →
 squash merge. Files under `.github/workflows/` are the one exception:

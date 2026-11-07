@@ -14,11 +14,17 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile check
-        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py
+        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py bridge/test_restarter.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py
       - name: Plist sanity check
-        run: python -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge.plist','rb'))"
+        run: |
+          python -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge.plist','rb'))"
+          python -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge-restarter.plist','rb'))"
+      - name: Shell syntax check
+        run: sh -n bridge/restart-bridge.sh
       - name: Bridge smoke test
         run: python bridge/test_bridge.py
+      - name: Restarter tests
+        run: python bridge/test_restarter.py
       - name: Reader unit tests
         run: python tools/test_t3r.py
       - name: Writer unit tests
