@@ -1,0 +1,5 @@
+name: "t3-muse-starter"
+title: "T3 Muse Starter"
+description: "Set up t3-muse from scratch and run it: Muse acts as PM for T3 Code through the official MCP connector and the file mailbox bridge, dispatching tasks, relaying approvals and reporting completions."
+category: "Work and knowledge"
+include_in_prompt: true

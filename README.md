@@ -68,6 +68,7 @@ PAT instead.
 |---|---|
 | `bridge/` | The always-on Mac bridge (path 2). Receives requests through the file mailbox via the paired device and runs allowlisted commands only (design notes in `bridge/README.md`) |
 | `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `pending` / `answer`) |
+| `skills/t3-muse-starter/` | A custom Muse skill for setting up t3-muse from scratch and running it day to day, with Muse as PM and T3 Code as the implementer |
 
 ## Answering approvals and questions
 
