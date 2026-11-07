@@ -83,6 +83,37 @@ def main() -> None:
         assert r["ok"] and r["exit_code"] == 4, r
         assert "projection_threads" in r["stdout"], r
 
+        # our writer, against a fake t3 CLI
+        shutil.copy(repo_root / "tools" / "t3w.py", tools_dir / "t3w.py")
+        fake = root / "fake-t3"
+        fake.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, sys\n"
+            "print(json.dumps({'argv': sys.argv[1:],"
+            " 'threadId': 'tid-123'}))\n")
+        fake.chmod(0o755)
+        wreq = {"env": {"T3M_T3CLI": str(fake)}}
+        r = roundtrip(dict(wreq, id="t-wstart",
+                           argv=["python3", "t3w.py", "start",
+                                 "/some/project", "do the thing"]))
+        assert r["ok"] and r["exit_code"] == 0, r
+        started = json.loads(r["stdout"])
+        assert started["threadId"] == "tid-123", started
+        assert started["argv"][:2] == ["thread", "start"], started
+
+        # writer validation: flag-like project, bad thread id, bad verb
+        r = roundtrip(dict(wreq, id="t-wevil",
+                           argv=["python3", "t3w.py", "start",
+                                 "--evil", "x"]))
+        assert not r["ok"] and r["exit_code"] == 2, r
+        r = roundtrip(dict(wreq, id="t-wbadid",
+                           argv=["python3", "t3w.py", "send",
+                                 "not-a-thread-id", "hi"]))
+        assert not r["ok"] and r["exit_code"] == 2, r
+        r = roundtrip(dict(wreq, id="t-wbogus",
+                           argv=["python3", "t3w.py", "bogus"]))
+        assert not r["ok"] and r["exit_code"] == 2, r
+
         print("bridge smoke test: OK")
     finally:
         proc.terminate()

@@ -7,13 +7,16 @@ writes results to ~/t3-tots-bridge/outbox/<id>.json.
 
 Design rules:
 - No network listener. The only input is local files in the inbox folder.
-- Allowlist only: the built-in bridge-ping and our own read-only
-  reader t3r.py (schema / health / status). No arbitrary shell,
+- Allowlist only: the built-in bridge-ping, our read-only reader
+  t3r.py (schema / health / status), and our task writer t3w.py
+  (start / send / show / list — the only write path, run solely for
+  requests the user asked Muse to make). No arbitrary shell,
   no other programs.
 - Every request and result is archived under done/ for audit.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -30,7 +33,39 @@ DEFAULT_TIMEOUT = 120
 MAX_OUTPUT = 200_000  # bytes per stream
 
 READER_SUBCOMMANDS = {"schema", "health", "status"}
-ENV_WHITELIST = {"T3M_DB"}
+WRITER_SUBCOMMANDS = {"start", "send", "show", "list"}
+ENV_WHITELIST = {"T3M_DB", "T3M_T3CLI"}
+THREAD_ID = re.compile(r"^[0-9a-fA-F-]{32,40}$")
+MAX_MESSAGE = 20_000
+
+
+def _validate_writer(rest, sub):
+    if sub in ("start", "send"):
+        if rest and rest[-1] == "--wait":
+            rest = rest[:-1]
+        if len(rest) != 2:
+            return f"t3w {sub} needs exactly two arguments"
+        target, message = rest
+        if target.startswith("-") or message.startswith("-"):
+            return "t3w arguments must not start with -"
+        if sub == "send" and not THREAD_ID.match(target):
+            return "t3w send needs a valid thread id"
+        if sub == "start" and len(target) > 500:
+            return "t3w start project argument too long"
+        if len(message) > MAX_MESSAGE:
+            return "t3w message too long"
+        return None
+    if sub == "show":
+        if len(rest) != 1 or not THREAD_ID.match(rest[0]):
+            return "t3w show needs a valid thread id"
+        return None
+    if sub == "list":
+        if len(rest) > 1:
+            return "t3w list takes at most one project argument"
+        if rest and rest[0].startswith("-"):
+            return "t3w list project must not start with -"
+        return None
+    return f"t3w.py subcommand not allowed: {sub}"
 
 
 def validate(argv):
@@ -43,6 +78,8 @@ def validate(argv):
         if argv[2] not in READER_SUBCOMMANDS:
             return f"t3r.py subcommand not allowed: {argv[2]}"
         return None
+    if argv[:2] == ["python3", "t3w.py"] and len(argv) >= 3:
+        return _validate_writer(argv[3:], argv[2])
     return "command not on the allowlist"
 
 
