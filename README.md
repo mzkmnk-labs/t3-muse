@@ -111,7 +111,8 @@ once it has expired. T3 Code has to be running.
 lists pending requests with it, renames it over the token file, and only
 then revokes the old session. A failure before the rename leaves the token
 file as it was. Once the rename is done it exits 0, with the new
-`expires_at`, the `previous_expires_at` and one of these:
+`expires_at`, `previous_expires_at` when one older session was found, and
+one of these:
 
 | `old_session` | Meaning |
 | --- | --- |
