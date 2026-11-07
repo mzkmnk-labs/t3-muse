@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1254" width="1240" height="1254" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse 構成図</title>
-  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行い、t3_thread_wait で待機する。Muse は完了までこの待機を保持し、タイムアウトしたら張り直す。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で一度だけ発行したトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。Grok 用の既存 t3-tots は対象外。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
+  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行い、t3_thread_wait で待機する。Muse は完了までこの待機を保持し、タイムアウトしたら張り直す。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。Grok 用の既存 t3-tots は対象外。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -195,7 +195,7 @@
   </g>
   <g class="edge from-muse" data-from="Answers" data-to="T3CLI">
     <path marker-end="url(#arrow-muse)" d="M650 870 V1006"/>
-    <text x="660" y="935">トークンを一度発行</text>
+    <text x="660" y="935">トークンを発行・更新</text>
   </g>
   <g class="edge dashed from-muse" data-from="Writer" data-to="T3CLI">
     <path marker-end="url(#arrow-muse)" d="M815 870 V1006"/>

@@ -90,7 +90,9 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Check the current tool description before relying on what the MCP pending request respond action can answer. In the build this skill was written against it covers user questions only and cannot approve a permission request, so approvals go through t3a.
 
-- Revoke the approval token from the Mac with the bundled T3 CLI session list and revoke commands when it expires or is no longer wanted. Reissue by revoking, deleting the token file and running issue-token again. The token lifetime is 90 days.
+- Update the approval token by running t3a renew through the bridge with a 300 second timeout. This is the normal route, and it also works once the token has expired. The token lifetime is 90 days. It issues a new token into a 0600 temp file, proves it with a pending list, swaps it in with an atomic rename and only then revokes the old session. A failure before the swap leaves the token file untouched. Report the facts it prints to the user, which are expires_at, old_session and, when one older session was found, previous_expires_at.
+
+- Treat the manual steps as the fallback. When old_session comes back left_active nothing was revoked, because renew revokes only what the session lists prove is the old session. Follow the note it prints: on the Mac, use the bundled T3 CLI session list and revoke commands and keep the t3-muse session issued last, because it belongs to the new token. When renew cannot run or the token is no longer wanted, revoke the session with those commands and delete the token file, then run issue-token again only to reissue.
 
 ## Monitor, report and merge
 
@@ -112,7 +114,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Replace bridge or tool files through the device file channel, verify them by reading back, and restart the daemon through the restart trigger instead of asking the user to run launchctl.
 
-- Re-approve the MCP connector grant when it expires at about 30 days and reissue the approval token before its 90 days run out.
+- Re-approve the MCP connector grant when it expires at about 30 days and renew the approval token with t3a renew before its 90 days run out.
 
 - Update docs/architecture.svg, docs/architecture.ja.svg and both README files whenever the architecture changes. README.md and docs/architecture.svg are English, and README.ja.md and docs/architecture.ja.svg are Japanese.
 

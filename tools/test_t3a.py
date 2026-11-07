@@ -32,6 +32,84 @@ if mode != "empty":
     print("{TOKEN}")
 """
 
+NEW_TOKEN = "T3A-NEW-SENTINEL-TOKEN.def_456-UVW"
+OLD_SESSION = "11111111-1111-4111-8111-111111111111"
+NEW_SESSION = "22222222-2222-4222-8222-222222222222"
+SPARE_SESSION = "33333333-3333-4333-8333-333333333333"
+OLD_EXPIRY = "2027-02-01T00:00:00.000Z"
+NEW_EXPIRY = "2027-03-01T00:00:00.000Z"
+
+
+def session(session_id, subject="t3-muse", label="t3-muse", expires=OLD_EXPIRY):
+    """One row of `t3 auth session list --json`, as a real t3 CLI prints it."""
+    return {"sessionId": session_id, "method": "bearer-access-token",
+            "scopes": ["orchestration:read", "orchestration:operate"],
+            "subject": subject, "client": {"label": label, "deviceType": "bot"},
+            "connected": False, "issuedAt": "2026-11-07T11:11:24.074Z",
+            "expiresAt": expires, "lastConnectedAt": None}
+
+
+# Sessions that must survive every renew: other clients, and near misses.
+BYSTANDERS = [
+    session("44444444-4444-4444-8444-444444444444", "t3-tots", "t3-tots"),
+    session("55555555-5555-4555-8555-555555555555", "mcp-client", "Muse"),
+    session("66666666-6666-4666-8666-666666666666", "t3-muse", "other-label"),
+    session("77777777-7777-4777-8777-777777777777", "other-subject", "t3-muse"),
+]
+NEW_ROW = session(NEW_SESSION, expires=NEW_EXPIRY)
+
+# A t3 CLI with a session table, like the real one. It prints the new token on
+# stderr as well, where the tool must never relay it, and like the real one it
+# exits 0 when asked to revoke a session it does not know.
+SESSION_CLI = """#!/usr/bin/env python3
+import json, os, sys, time
+args = sys.argv[1:]
+with open(os.environ["STUB_RECORD"], "a") as f:
+    f.write(json.dumps(args) + "\\n")
+with open(os.environ["STUB_RECORD"]) as f:
+    calls = [json.loads(line) for line in f]
+with open(os.environ["STUB_SESSIONS"]) as f:
+    sessions = json.load(f)
+def save():
+    with open(os.environ["STUB_SESSIONS"], "w") as f:
+        json.dump(sessions, f)
+verb = args[2]
+new_token = os.environ["STUB_NEW_TOKEN"]
+sys.stderr.write("stderr chatter " + new_token + "\\n")
+if verb == "issue":
+    time.sleep(float(os.environ.get("STUB_ISSUE_SLEEP", "0")))
+    seen = os.fstat(1)
+    folder = os.environ["STUB_TOOLS"]
+    with open(os.environ["STUB_TEMP_SEEN"], "w") as f:
+        json.dump({"mode": seen.st_mode & 0o777, "names": [
+            name for name in os.listdir(folder)
+            if os.lstat(os.path.join(folder, name)).st_ino == seen.st_ino]}, f)
+    issued = json.loads(os.environ["STUB_ISSUED_ROWS"])
+    if issued:
+        sessions.extend(issued)
+        save()
+    sys.stdout.write(os.environ.get("STUB_ISSUE_OUTPUT", new_token + "\\n"))
+    raise SystemExit(int(os.environ.get("STUB_ISSUE_EXIT", "0")))
+if verb == "list":
+    modes = os.environ.get("STUB_LIST", "ok").split(",")
+    index = len([c for c in calls if c[2] == "list"]) - 1
+    mode = modes[min(index, len(modes) - 1)]
+    if mode == "fail":
+        raise SystemExit(1)
+    print("{not json" if mode == "garbage" else json.dumps(sessions))
+if verb == "revoke":
+    with open(os.environ["STUB_TOKEN_FILE"]) as f:
+        token_at_revoke = f.read()
+    with open(os.environ["STUB_REVOKE_SAW"], "a") as f:
+        f.write(token_at_revoke)
+    mode = os.environ.get("STUB_REVOKE", "ok")
+    if mode == "fail":
+        raise SystemExit(1)
+    if mode == "ok":
+        sessions[:] = [r for r in sessions if r["sessionId"] != args[3]]
+        save()
+"""
+
 APPROVAL_ID = "runtime-request:provider:codex:provider-turn:provider-turn%3Aa:r_1"
 SECOND_APPROVAL_ID = "runtime-request:provider:codex:provider-turn:provider-turn%3Aa:r_2"
 RESOLVED_ID = "runtime-request:provider:codex:provider-turn:provider-turn%3Aa:r_0"
@@ -146,8 +224,11 @@ PROJECTIONS = {
 class StubT3Server:
     """Just enough of T3's /ws endpoint, on stdlib sockets."""
 
-    def __init__(self, status=101, dispatch_exit=None, close_after_upgrade=False):
+    def __init__(self, status=101, dispatch_exit=None, close_after_upgrade=False,
+                 reject_token=None, on_handshake=None):
         self.status = status
+        self.reject_token = reject_token
+        self.on_handshake = on_handshake
         self.dispatch_exit = dispatch_exit or {
             "_tag": "Success", "value": {"sequence": 42}}
         self.close_after_upgrade = close_after_upgrade
@@ -192,8 +273,13 @@ class StubT3Server:
             data += chunk
         head = data.split(b"\r\n\r\n", 1)[0].decode()
         self.handshakes.append(head)
-        if self.status != 101:
-            conn.sendall(f"HTTP/1.1 {self.status} Nope\r\n"
+        if self.on_handshake:
+            self.on_handshake()
+        status = self.status
+        if self.reject_token and f"Bearer {self.reject_token}\r\n" in head + "\r\n":
+            status = 401
+        if status != 101:
+            conn.sendall(f"HTTP/1.1 {status} Nope\r\n"
                          "Content-Length: 0\r\n\r\n".encode())
             return
         key = next(line.split(":", 1)[1].strip()
@@ -395,6 +481,398 @@ class IssueTokenTest(T3aCase):
         proc = self.run_t3a("issue-token", T3M_T3CLI=str(self.tmp / "nope"))
         self.assert_error(proc, "T3CLI_NOT_FOUND", 5)
         self.assertFalse(self.token_file.exists())
+
+
+class RenewTest(T3aCase):
+    def setUp(self):
+        super().setUp()
+        self.cli.write_text(SESSION_CLI)
+        self.sessions_file = self.tmp / "sessions.json"
+        self.temp_seen = self.tmp / "temp-seen"
+        self.revoke_saw = self.tmp / "token-at-revoke"
+        self.at_handshake = []
+
+    def server(self, **kwargs):
+        return self.start_server(
+            on_handshake=lambda: self.at_handshake.append(
+                self.token_file.read_text()), **kwargs)
+
+    def renew(self, sessions=None, issued=None, **env):
+        """Run renew, and check what must hold however the run went."""
+        if sessions is None:
+            sessions = [session(OLD_SESSION), *BYSTANDERS]
+        self.sessions_file.write_text(json.dumps(sessions))
+        stub_env = dict(
+            STUB_SESSIONS=str(self.sessions_file),
+            STUB_NEW_TOKEN=NEW_TOKEN,
+            STUB_ISSUED_ROWS=json.dumps([NEW_ROW] if issued is None else issued),
+            STUB_TOOLS=str(self.tools),
+            STUB_TEMP_SEEN=str(self.temp_seen),
+            STUB_TOKEN_FILE=str(self.token_file),
+            STUB_REVOKE_SAW=str(self.revoke_saw))
+        stub_env.update(env)
+        proc = self.run_t3a("renew", **stub_env)
+        for secret in (NEW_TOKEN, OLD_SESSION, NEW_SESSION, SPARE_SESSION):
+            self.assertNotIn(secret, proc.stdout)
+            self.assertNotIn(secret, proc.stderr)
+        leftovers = [p.name for p in self.tools.iterdir()
+                     if p.name.startswith(".t3a-token.")]
+        self.assertEqual(leftovers, [], "no temp file may be left behind")
+        return proc
+
+    def renewed(self, *args, **kwargs):
+        proc = self.renew(*args, **kwargs)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stderr, "")
+        self.assertEqual(self.token_file.read_text().strip(), NEW_TOKEN)
+        self.assertEqual(stat.S_IMODE(self.token_file.stat().st_mode), 0o600)
+        out = json.loads(proc.stdout)
+        self.assertIs(out["renewed"], True)
+        return out
+
+    def failed(self, code, exit_code, *args, **kwargs):
+        """Run a renew that must fail and leave the token file untouched."""
+        before = self.token_file.read_text()
+        before_stat = self.token_file.stat()
+        proc = self.renew(*args, **kwargs)
+        self.assert_error(proc, code, exit_code)
+        self.assertEqual(self.token_file.read_text(), before)
+        self.assertEqual(self.token_file.stat().st_ino, before_stat.st_ino)
+        return json.loads(proc.stderr)["message"]
+
+    def calls(self):
+        if not self.record.exists():
+            return []
+        return [json.loads(line) for line in self.record.read_text().splitlines()]
+
+    def verbs(self):
+        return [call[2] for call in self.calls()]
+
+    def revoked(self):
+        return [call[3] for call in self.calls() if call[2] == "revoke"]
+
+    def listed_ids(self):
+        return {row["sessionId"]
+                for row in json.loads(self.sessions_file.read_text())}
+
+    def assert_left_active(self, out):
+        self.assertEqual(out["old_session"], "left_active")
+        self.assertEqual(self.revoked(), [], "nothing may be revoked")
+        self.assertIn("not revoked", out["note"])
+        self.assertIn("t3 auth session revoke", out["note"])
+
+    # --- the normal run ---------------------------------------------------
+
+    def test_replaces_the_token_and_revokes_the_old_session(self):
+        self.server()
+        out = self.renewed()
+        self.assertEqual(out, {"renewed": True, "expires_at": NEW_EXPIRY,
+                               "previous_expires_at": OLD_EXPIRY,
+                               "old_session": "revoked"})
+        self.assertEqual(self.revoked(), [OLD_SESSION])
+        self.assertEqual(self.listed_ids(),
+                         {NEW_SESSION} | {r["sessionId"] for r in BYSTANDERS})
+
+    def test_steps_run_in_the_safe_order(self):
+        server = self.server()
+        self.renewed()
+        self.assertEqual(self.verbs(),
+                         ["list", "issue", "list", "revoke", "list"])
+        # The check used the new token while the file still held the old one.
+        self.assertEqual(self.at_handshake, [TOKEN + "\n"])
+        self.assertIn(f"Authorization: Bearer {NEW_TOKEN}", server.handshakes[0])
+        # By the time of the revoke, the file held the new one.
+        self.assertEqual(self.revoke_saw.read_text().strip(), NEW_TOKEN)
+
+    def test_check_only_lists(self):
+        server = self.server()
+        self.renewed()
+        tags = {request["tag"] for request in server.requests}
+        self.assertNotIn("orchestration.dispatchCommand", tags)
+        self.assertIn("orchestration.subscribeShell", tags)
+
+    def test_issues_with_the_same_arguments_as_issue_token(self):
+        self.server()
+        self.renewed()
+        self.assertEqual(
+            next(c for c in self.calls() if c[2] == "issue"), [
+                "auth", "session", "issue",
+                "--scope", "orchestration:read",
+                "--scope", "orchestration:operate",
+                "--ttl", "90d", "--label", "t3-muse", "--subject", "t3-muse",
+                "--token-only"])
+
+    def test_temp_file_is_private_and_beside_the_token(self):
+        self.server()
+        self.renewed()
+        seen = json.loads(self.temp_seen.read_text())
+        self.assertEqual(seen["mode"], 0o600)
+        self.assertEqual(len(seen["names"]), 1, "the temp file is in the folder")
+        self.assertNotIn(NEW_TOKEN, seen["names"][0])
+
+    def test_temp_file_is_private_even_with_a_permissive_umask(self):
+        self.server()
+        self.sessions_file.write_text(json.dumps([session(OLD_SESSION)]))
+        script = (f"import os, runpy, sys; os.umask(0); "
+                  f"sys.argv = ['t3a.py', 'renew']; "
+                  f"runpy.run_path({str(self.tools / 't3a.py')!r}, "
+                  f"run_name='__main__')")
+        env = dict(os.environ, T3M_T3CLI=str(self.cli),
+                   T3M_T3_HOME=str(self.t3_home),
+                   STUB_RECORD=str(self.record),
+                   STUB_SESSIONS=str(self.sessions_file),
+                   STUB_NEW_TOKEN=NEW_TOKEN,
+                   STUB_ISSUED_ROWS=json.dumps([NEW_ROW]),
+                   STUB_TOOLS=str(self.tools),
+                   STUB_TEMP_SEEN=str(self.temp_seen),
+                   STUB_TOKEN_FILE=str(self.token_file),
+                   STUB_REVOKE_SAW=str(self.revoke_saw))
+        proc = subprocess.run([sys.executable, "-c", script], env=env,
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(self.temp_seen.read_text())["mode"], 0o600)
+        self.assertEqual(stat.S_IMODE(self.token_file.stat().st_mode), 0o600)
+
+    def test_an_expired_token_can_be_renewed(self):
+        # Its session has already dropped out of the active list.
+        self.server()
+        out = self.renewed(sessions=list(BYSTANDERS))
+        self.assertEqual(out["old_session"], "none_active")
+        self.assertEqual(out["expires_at"], NEW_EXPIRY)
+        self.assertNotIn("note", out)
+        self.assertEqual(self.revoked(), [])
+
+    def test_stale_temp_file_is_removed(self):
+        self.server()
+        stale = self.tools / ".t3a-token.renew-killedrun"
+        stale.write_text("a token from a killed run\n")
+        self.renewed()
+        self.assertFalse(stale.exists())
+
+    # --- refused before anything is issued --------------------------------
+
+    def test_no_token_file_is_issue_tokens_job(self):
+        proc = self.renew()
+        self.assert_error(proc, "NO_TOKEN", 3)
+        self.assertIn("issue-token", json.loads(proc.stderr)["message"])
+        self.assertFalse(self.token_file.exists())
+        self.assertEqual(self.calls(), [], "the CLI must not have run")
+
+    def test_token_behind_a_symlink(self):
+        real = self.tmp / "real-token"
+        real.write_text(TOKEN)
+        real.chmod(0o600)
+        self.token_file.symlink_to(real)
+        proc = self.renew()
+        self.assert_error(proc, "TOKEN_INSECURE", 3)
+        self.assertTrue(self.token_file.is_symlink())
+        self.assertEqual(real.read_text(), TOKEN)
+        self.assertEqual(self.calls(), [])
+
+    def test_token_readable_by_others(self):
+        self.write_token(mode=0o644)
+        self.failed("TOKEN_INSECURE", 3)
+        self.assertEqual(self.calls(), [])
+
+    def test_missing_cli(self):
+        self.write_token()
+        self.write_runtime(3773)
+        self.failed("T3CLI_NOT_FOUND", 5, T3M_T3CLI=str(self.tmp / "nope"))
+
+    def test_server_not_running_issues_nothing(self):
+        self.write_token()
+        self.failed("T3_NOT_RUNNING", 4)
+        self.assertEqual(self.calls(), [])
+
+    def test_non_local_server_issues_nothing(self):
+        self.write_token()
+        self.write_runtime(3773, host="93.184.216.34")
+        self.failed("T3_NOT_LOCAL", 4)
+        self.assertEqual(self.calls(), [])
+
+    def test_arguments_are_refused(self):
+        self.write_token()
+        self.assert_error(self.run_t3a("renew", "extra"), "USAGE", 2)
+        self.assert_error(self.run_t3a("renew", "--ttl", "1d"), "USAGE", 2)
+        self.assertEqual(self.token_file.read_text(), TOKEN + "\n")
+        self.assertEqual(self.calls(), [])
+
+    # --- failures before the rename leave the token file intact -----------
+
+    def test_issue_failure(self):
+        self.server()
+        message = self.failed("ISSUE_FAILED", 5, issued=[], STUB_ISSUE_EXIT="7")
+        self.assertIn("not changed", message)
+        self.assertIn("No new session", message)
+        self.assertEqual(self.revoked(), [])
+
+    def test_issue_failure_after_a_session_was_created(self):
+        self.server()
+        message = self.failed("ISSUE_FAILED", 5, STUB_ISSUE_EXIT="7")
+        self.assertEqual(self.revoked(), [NEW_SESSION])
+        self.assertIn("new session was revoked", message)
+
+    def test_empty_issue_output(self):
+        self.server()
+        self.failed("ISSUE_FAILED", 5, issued=[], STUB_ISSUE_OUTPUT="")
+
+    def test_unusable_issue_output_is_never_sent(self):
+        server = self.server()
+        self.failed("ISSUE_FAILED", 5, STUB_ISSUE_OUTPUT="not a token\n")
+        self.assertEqual(server.handshakes, [])
+        self.assertEqual(self.revoked(), [NEW_SESSION])
+
+    def test_issue_timeout(self):
+        (self.tools / "t3a.py").write_text(
+            T3A.read_text().replace("CLI_TIMEOUT = 60", "CLI_TIMEOUT = 1"))
+        self.server()
+        self.failed("ISSUE_FAILED", 5, issued=[], STUB_ISSUE_SLEEP="5")
+
+    def test_new_token_rejected(self):
+        self.server(reject_token=NEW_TOKEN)
+        message = self.failed("TOKEN_REJECTED", 3)
+        # Nothing here may send anyone to delete the good token file.
+        self.assertNotIn("elete", message)
+        self.assertIn("not changed", message)
+        self.assertEqual(self.revoked(), [NEW_SESSION])
+        self.assertIn("new session was revoked", message)
+        self.assertIn(OLD_SESSION, self.listed_ids())
+
+    def test_server_gone_by_the_check(self):
+        self.write_token()
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+        self.write_runtime(port)
+        self.failed("T3_NOT_RUNNING", 4)
+        self.assertEqual(self.revoked(), [NEW_SESSION])
+
+    def test_connection_dropped_during_the_check(self):
+        self.server(close_after_upgrade=True)
+        self.failed("T3_PROTOCOL", 4)
+        self.assertEqual(self.revoked(), [NEW_SESSION])
+
+    def test_failed_check_when_the_new_session_cannot_be_identified(self):
+        self.server(reject_token=NEW_TOKEN)
+        message = self.failed("TOKEN_REJECTED", 3, STUB_LIST="fail")
+        self.assertEqual(self.revoked(), [], "nothing may be revoked blindly")
+        self.assertIn("may be left behind", message)
+        self.assertIn("issued last", message)
+
+    def test_failed_check_with_two_new_sessions_revokes_nothing(self):
+        self.server(reject_token=NEW_TOKEN)
+        message = self.failed("TOKEN_REJECTED", 3,
+                              issued=[NEW_ROW, session(SPARE_SESSION)])
+        self.assertEqual(self.revoked(), [])
+        self.assertIn("may be left behind", message)
+
+    def test_rename_failure(self):
+        # Something takes the token file's place, so the rename cannot work.
+        def obstruct():
+            self.token_file.unlink()
+            self.token_file.mkdir()
+        self.start_server(on_handshake=obstruct)
+        proc = self.renew()
+        self.assert_error(proc, "RENEW_FAILED", 5)
+        self.assertTrue(self.token_file.is_dir())
+        self.assertEqual(self.revoked(), [NEW_SESSION])
+
+    @unittest.skipIf(os.geteuid() == 0, "root ignores folder permissions")
+    def test_temp_file_cannot_be_created(self):
+        self.server()
+        self.tools.chmod(0o500)
+        self.addCleanup(self.tools.chmod, 0o700)
+        self.failed("RENEW_FAILED", 5, issued=[])
+        self.assertNotIn("issue", self.verbs(), "nothing may be issued")
+
+    # --- after the rename: renewed, and honest about the old session ------
+
+    def test_list_unreadable_from_the_start(self):
+        self.server()
+        for mode in ("fail", "garbage"):
+            with self.subTest(mode=mode):
+                self.record.unlink(missing_ok=True)
+                self.write_token()
+                out = self.renewed(STUB_LIST=mode)
+                self.assert_left_active(out)
+                self.assertIsNone(out["expires_at"])
+
+    def test_list_unreadable_after_the_rename(self):
+        self.server()
+        out = self.renewed(STUB_LIST="ok,fail")
+        self.assert_left_active(out)
+        self.assertIsNone(out["expires_at"])
+
+    def test_list_shape_changed(self):
+        self.server()
+        for rows in ({"sessions": []}, ["not a row"], [{"subject": "t3-muse",
+                                                        "client": {"label": "t3-muse"}}]):
+            with self.subTest(rows=rows):
+                self.record.unlink(missing_ok=True)
+                self.write_token()
+                out = self.renewed(sessions=rows, issued=[])
+                self.assert_left_active(out)
+
+    def test_flag_like_session_id_is_never_passed_on(self):
+        self.server()
+        out = self.renewed(sessions=[session("--all")])
+        self.assert_left_active(out)
+
+    def test_new_session_not_in_the_list(self):
+        # The only candidate might be anything, so it must be left alone.
+        self.server()
+        out = self.renewed(issued=[])
+        self.assert_left_active(out)
+        self.assertIn(OLD_SESSION, self.listed_ids())
+
+    def test_two_new_sessions(self):
+        self.server()
+        out = self.renewed(issued=[NEW_ROW, session(SPARE_SESSION)])
+        self.assert_left_active(out)
+
+    def test_two_old_sessions(self):
+        self.server()
+        out = self.renewed(sessions=[session(OLD_SESSION),
+                                     session(SPARE_SESSION)])
+        self.assert_left_active(out)
+        self.assertEqual(out["expires_at"], NEW_EXPIRY)
+        self.assertIn("2 older", out["note"])
+
+    def test_only_the_session_the_old_token_names_is_revoked(self):
+        def naming(session_id):
+            claims = json.dumps({"sid": session_id, "sub": "t3-muse"})
+            payload = base64.urlsafe_b64encode(claims.encode()).decode()
+            return payload.rstrip("=") + ".signature\n"
+        self.server()
+        self.token_file.write_text(naming(OLD_SESSION))
+        self.assertEqual(self.renewed()["old_session"], "revoked")
+        self.assertEqual(self.revoked(), [OLD_SESSION])
+
+        self.record.unlink()
+        self.token_file.write_text(naming(SPARE_SESSION))
+        out = self.renewed()
+        self.assert_left_active(out)
+        self.assertIn(OLD_SESSION, self.listed_ids())
+
+    def test_revoke_failure_is_reported(self):
+        self.server()
+        out = self.renewed(STUB_REVOKE="fail")
+        self.assertEqual(out["old_session"], "left_active")
+        self.assertEqual(self.revoked(), [OLD_SESSION])
+        self.assertIn("t3 auth session revoke", out["note"])
+
+    def test_revoke_that_exits_0_without_revoking_is_not_believed(self):
+        self.server()
+        out = self.renewed(STUB_REVOKE="noop")
+        self.assertEqual(out["old_session"], "left_active")
+        self.assertIn(OLD_SESSION, self.listed_ids())
+
+    def test_revoke_that_cannot_be_confirmed_is_not_believed(self):
+        self.server()
+        out = self.renewed(STUB_LIST="ok,ok,fail")
+        self.assertEqual(out["old_session"], "left_active")
+        self.assertIn("did not confirm", out["note"])
 
 
 class AnswerArgumentsTest(T3aCase):

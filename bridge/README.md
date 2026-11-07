@@ -19,11 +19,12 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-muse-bri
 
 ## セキュリティ
 
-- 実行できるのは許可リストのみ：組み込み `bridge-ping`、自前リーダー `t3r.py` の読み取り専用サブコマンド（`schema` / `health` / `status`）、自前ライター `t3w.py`（`start` / `send` / `show` / `list` / `add-project`）、回答中継 `t3a.py`（`issue-token` / `pending` / `answer`）。旧来の外部ツールは許可リストに無い
+- 実行できるのは許可リストのみ：組み込み `bridge-ping`、自前リーダー `t3r.py` の読み取り専用サブコマンド（`schema` / `health` / `status`）、自前ライター `t3w.py`（`start` / `send` / `show` / `list` / `add-project`）、回答中継 `t3a.py`（`issue-token` / `renew` / `pending` / `answer`）。旧来の外部ツールは許可リストに無い
 - `t3w.py` が唯一の書き込み経路。T3 純正 CLI 経由でスレッド作成とメッセージ送信を行うもので、ブリッジ側で引数の形（スレッド ID の形式、フラグ混入、文字数）を検証する。実行されるのはユーザーが Muse に依頼したリクエストだけ
-- `t3a.py` は T3 の承認待ち・質問待ちへの回答を中継する。ブリッジ側で引数の形を検証する：`issue-token` と `pending` は引数なし。`answer` はリクエスト ID の形式に加え、`approve` / `deny` なら末尾の `--user-approved` が必須（無ければブリッジでもツールでも拒否）。それ以外の回答テキストは空でなく 4000 文字以内で、`-` で始まらず、`--user-approved` を付けない
+- `t3a.py` は T3 の承認待ち・質問待ちへの回答を中継する。ブリッジ側で引数の形を検証する：`issue-token` と `renew` と `pending` は引数なし。`answer` はリクエスト ID の形式に加え、`approve` / `deny` なら末尾の `--user-approved` が必須（無ければブリッジでもツールでも拒否）。それ以外の回答テキストは空でなく 4000 文字以内で、`-` で始まらず、`--user-approved` を付けない
 - `--user-approved` は人が決めたことの記録であり、Muse が自分の判断で付けてはならない。証明ではなく約束なので、監査は done/ に残るリクエストで行う
-- `t3a.py` のトークンは Mac の外に出ず、表示もされない。保存先はツールフォルダの 0600 のファイル `.t3a-token` だけで、CLI の stdout をファイルへ直接流すため、ブリッジの出力にも outbox / done にも現れない。接続先はループバックのみ
+- `t3a.py` のトークンは Mac の外に出ず、表示もされない。保存先はツールフォルダの 0600 のファイル `.t3a-token` と、`renew` の実行中だけ使う同じフォルダの 0600 の一時ファイルだけで、CLI の stdout をファイルへ直接流すため、ブリッジの出力にも outbox / done にも現れない。接続先はループバックのみ
+- `renew` は新しいトークンで `pending` を確認してから rename で `.t3a-token` を置き換え、その後で旧セッションを失効させる。置き換え前に失敗すれば `.t3a-token` は変わらない。発行前後の `t3 auth session list` で旧セッションと確定できない場合は何も失効させず、結果に手動の手順を残す
 - Muse はユーザーが決めた内容を中継するだけで、自分の判断では何も承認しない
 - 環境変数の許可はエントリごと：`t3a.py` には `T3M_T3CLI` と `T3M_T3_HOME` だけ、`t3r.py` / `t3w.py` には従来どおり `T3M_DB` と `T3M_T3CLI` だけを渡す
 - 任意のシェルコマンドは実行できない。SSH のようなフルシェル権限にはならない
@@ -67,6 +68,7 @@ Mac 側でチェックアウト（ghq 管理なら worktree）から:
 - フォルダ内の項目はすべてトリガーになる。Finder が作る `.DS_Store` でも再起動が走る
 - ブリッジ本体に launchctl の権限はない。許可リストに launchctl は入っておらず、ブリッジ経由では実行できない
 - 再起動は実行中のリクエストを中断する。リクエストは完了後に `done/` へ移るため、中断されたものは `inbox/` に残って再起動後にもう一度実行される。`t3w.py` の `start` / `send` が二重に実行されうるので、`inbox/` が空のときにトリガーを置く
+- `t3a.py renew` が再起動やタイムアウトで強制終了されると、一時ファイルと余分な `t3-muse` セッションが残ることがある。一時ファイルは次の `renew` が消す。余分なセッションが残ると次の `renew` は旧セッションを確定できず `left_active` を返すので、出力の手順に沿って手動で失効させる
 - 止め方は 2 つの plist の unload。ブリッジだけ unload した状態でトリガーを置いても、kickstart が失敗するだけでブリッジは起動しない
 
 ## リクエスト形式
@@ -81,10 +83,11 @@ Mac 側でチェックアウト（ghq 管理なら worktree）から:
 {"id": "20261107-002", "argv": ["python3", "t3w.py", "start", "/path/to/project", "依頼内容"], "timeout": 120}
 ```
 
-承認待ち・質問待ちへの回答の例（トークンは最初に `issue-token` で一度だけ発行する。詳細と失効手順は `README.ja.md`）:
+承認待ち・質問待ちへの回答の例（トークンは最初に `issue-token` で発行し、更新は `renew` で行う。`renew` は CLI を数回呼ぶので `timeout` を長めにする。詳細と失効手順は `README.ja.md`）:
 
 ```json
 {"id": "20261107-003", "argv": ["python3", "t3a.py", "issue-token"], "timeout": 120}
+{"id": "20261107-007", "argv": ["python3", "t3a.py", "renew"], "timeout": 300}
 {"id": "20261107-004", "argv": ["python3", "t3a.py", "pending"], "timeout": 120}
 {"id": "20261107-005", "argv": ["python3", "t3a.py", "answer", "<request-id>", "deny", "--user-approved"], "timeout": 120}
 {"id": "20261107-006", "argv": ["python3", "t3a.py", "answer", "<request-id>", "回答テキスト"], "timeout": 120}
