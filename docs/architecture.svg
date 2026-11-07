@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 950" width="1160" height="950" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1254" width="1240" height="1254" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse architecture / t3-muse 構成図</title>
-  <desc id="desc">User sends requests and approvals to Muse. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, which restarts only the bridge job.</desc>
+  <desc id="desc">User talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads and waits with t3_thread_wait, which Muse holds until the run is done and re-arms after a timeout. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py, a launchd daemon, polls the inbox and runs allowlisted commands only. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -108,190 +108,257 @@
     <marker id="arrow-old" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto"><path class="head-old" d="M0 0 L13 5.5 L0 11 L3 5.5 z"/></marker>
   </defs>
 
-  <rect class="card" width="1160" height="950" rx="16"/>
+  <rect class="card" width="1240" height="1254" rx="16"/>
 
   <!-- Boundaries -->
   <g class="mac">
-    <rect x="16" y="172" width="1128" height="762" rx="18"/>
-    <text class="t" x="36" y="206">Mac Studio</text>
+    <rect x="16" y="296" width="1208" height="942" rx="18"/>
+    <text class="t" x="36" y="330">Mac Studio</text>
   </g>
   <g class="group-muse">
-    <rect x="238" y="372" width="890" height="318" rx="14"/>
-    <text x="261" y="395"><tspan class="s" font-weight="700">t3-muse</tspan><tspan class="s" dx="8">this repo / 本リポジトリ</tspan></text>
+    <rect x="218" y="496" width="682" height="390" rx="14"/>
+    <text x="241" y="519"><tspan class="s" font-weight="700">t3-muse</tspan><tspan class="s" dx="8">this repo / 本リポジトリ</tspan></text>
   </g>
   <g class="group-t3">
-    <rect x="32" y="752" width="1096" height="168" rx="14"/>
-    <text x="462" y="776"><tspan class="s" font-weight="700">T3 Code</tspan><tspan class="s" dx="8">side / T3 Code 側</tspan></text>
+    <rect x="32" y="974" width="1176" height="250" rx="14"/>
+    <text x="962" y="998"><tspan class="s" font-weight="700">T3 Code</tspan><tspan class="s" dx="8">side / T3 Code 側</tspan></text>
+  </g>
+
+  <!-- Path captions -->
+  <g class="from-ext">
+    <text class="s e" font-weight="700" x="1080" y="118">Path 1: operations (default)</text>
+    <text class="s e" font-weight="700" x="1080" y="138">経路1: 操作系・既定</text>
+    <text class="s e" font-weight="700" x="550" y="130">Path 2: file mailbox bridge</text>
+    <text class="s e" font-weight="700" x="550" y="150">経路2: ファイルメールボックス・ブリッジ</text>
   </g>
 
   <!-- Edges: data-from and data-to use the node ids below; each arrow points at data-to -->
   <g class="edge from-ext" data-from="User" data-to="Muse">
-    <path marker-end="url(#arrow-ext)" d="M280 60 H496"/>
-    <text class="c" x="388" y="50">requests, approvals</text>
-    <text class="c" x="388" y="81">依頼・承認</text>
+    <path marker-end="url(#arrow-ext)" d="M190 60 H418"/>
+    <text class="c" x="304" y="50">requests, approvals in chat</text>
+    <text class="c" x="304" y="81">チャットで依頼・承認</text>
   </g>
+
+  <!-- Path 1 -->
+  <g class="edge from-ext" data-from="Muse" data-to="Connector">
+    <path marker-end="url(#arrow-ext)" d="M730 60 H968"/>
+    <text class="c" x="849" y="50">dispatches tasks as PM</text>
+    <text class="c" x="849" y="81">PM としてタスクを dispatch</text>
+  </g>
+  <g class="edge from-ext" data-from="Connector" data-to="Relay">
+    <path marker-end="url(#arrow-ext)" d="M1090 96 V148"/>
+    <text x="1100" y="128">HTTPS</text>
+  </g>
+  <g class="edge from-ext" data-from="Relay" data-to="MCP">
+    <path marker-end="url(#arrow-ext)" d="M950 274 V1006"/>
+    <text x="962" y="540">starts, sends to, reads and</text>
+    <text x="962" y="559">lists threads</text>
+    <text x="962" y="583">スレッドの起動・送信・</text>
+    <text x="962" y="602">読み取り・一覧</text>
+    <text x="962" y="660"><tspan class="mono">t3_thread_wait</tspan>: Muse holds it</text>
+    <text x="962" y="679">until done, re-arms on timeout</text>
+    <text x="962" y="703"><tspan class="mono">t3_thread_wait</tspan> で完了待ち</text>
+    <text x="962" y="722">タイムアウトしたら張り直す</text>
+    <text x="962" y="780"><tspan class="mono">t3_pending_request</tspan> answers</text>
+    <text x="962" y="799">questions only, not approvals</text>
+    <text x="962" y="823"><tspan class="mono">t3_pending_request</tspan> は</text>
+    <text x="962" y="842">質問への回答のみ、承認は不可</text>
+  </g>
+  <g class="edge from-t3" data-from="MCP" data-to="T3">
+    <path marker-end="url(#arrow-t3)" d="M1048 1092 V1138"/>
+    <text x="1058" y="1112">thread operations</text>
+    <text x="1058" y="1132">スレッド操作</text>
+  </g>
+
+  <!-- Path 2 -->
   <g class="edge from-ext" data-from="Muse" data-to="Mailbox">
-    <path marker-end="url(#arrow-ext)" d="M793 96 V202"/>
-    <text x="803" y="130">writes request JSON via the device channel</text>
-    <text x="803" y="151">デバイスチャネルでリクエスト JSON を書く</text>
+    <path marker-end="url(#arrow-ext)" d="M660 96 V326"/>
+    <text x="670" y="190">writes request JSON</text>
+    <text x="670" y="209">via the paired device</text>
+    <text x="670" y="233">ペアデバイス経由で</text>
+    <text x="670" y="252">リクエスト JSON を書く</text>
   </g>
   <g class="edge from-box" data-from="Mailbox" data-to="Muse">
-    <path marker-end="url(#arrow-box)" d="M573 204 V98"/>
-    <text class="e" x="563" y="130">returns result JSON</text>
-    <text class="e" x="563" y="151">結果 JSON を返す</text>
+    <path marker-end="url(#arrow-box)" d="M560 328 V98"/>
+    <text class="e" x="550" y="220">returns result JSON</text>
+    <text class="e" x="550" y="241">結果 JSON を返す</text>
   </g>
   <g class="edge from-muse" data-from="Bridge" data-to="Mailbox">
-    <path marker-end="url(#arrow-muse)" d="M683 404 V302"/>
-    <text x="693" y="332">polls the inbox</text>
-    <text x="693" y="353">inbox をポーリング</text>
+    <path marker-end="url(#arrow-muse)" d="M670 528 V426"/>
+    <text x="680" y="456">polls the inbox</text>
+    <text x="680" y="477">inbox をポーリング</text>
   </g>
   <g class="edge from-muse" data-from="Bridge" data-to="Reader">
-    <path marker-end="url(#arrow-muse)" d="M565 460 H423"/>
-    <text class="c" x="493" y="428">runs allowlisted</text>
-    <text class="c" x="493" y="447">commands only</text>
-    <text class="c" x="493" y="479">許可したコマンド</text>
-    <text class="c" x="493" y="498">だけ実行</text>
-  </g>
-  <g class="edge from-muse" data-from="Bridge" data-to="Writer">
-    <path marker-end="url(#arrow-muse)" d="M801 460 H943"/>
-    <text class="c" x="873" y="428">runs allowlisted</text>
-    <text class="c" x="873" y="447">commands only</text>
-    <text class="c" x="873" y="479">許可したコマンド</text>
-    <text class="c" x="873" y="498">だけ実行</text>
-  </g>
-  <g class="edge from-muse" data-from="Reader" data-to="DB">
-    <path marker-end="url(#arrow-muse)" d="M341 516 V789"/>
-    <text x="351" y="558">opens read-only</text>
-    <text x="351" y="579">読み取り専用で開く</text>
-  </g>
-  <g class="edge from-muse" data-from="Writer" data-to="T3CLI">
-    <path marker-end="url(#arrow-muse)" d="M1025 516 V798"/>
-    <text class="e" x="1015" y="558">creates threads, sends prompts</text>
-    <text class="e" x="1015" y="579">スレッド作成・送信</text>
-  </g>
-  <g class="edge from-t3" data-from="T3CLI" data-to="T3">
-    <path marker-end="url(#arrow-t3)" d="M930 848 H770"/>
-    <text class="c" x="849" y="838">local session</text>
-    <text class="c" x="849" y="869">ローカルセッション</text>
-  </g>
-  <g class="edge from-t3" data-from="T3" data-to="DB">
-    <path marker-end="url(#arrow-t3)" d="M598 848 H442"/>
-    <text class="c" x="519" y="838">reads and writes</text>
-    <text class="c" x="519" y="869">読み書き</text>
+    <path marker-end="url(#arrow-muse)" d="M314 616 V694"/>
+    <text class="c" x="426" y="648">allowlisted commands only</text>
+    <text class="c" x="426" y="670">許可したコマンドだけ実行</text>
   </g>
   <g class="edge from-muse" data-from="Bridge" data-to="Answers">
-    <path marker-end="url(#arrow-muse)" d="M683 516 V564"/>
-    <text class="e" x="673" y="534">runs allowlisted commands only</text>
-    <text class="e" x="673" y="554">許可したコマンドだけ実行</text>
+    <path marker-end="url(#arrow-muse)" d="M539 616 V694"/>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Writer">
+    <path marker-end="url(#arrow-muse)" d="M784 616 V694"/>
+    <text class="c" x="661" y="648">allowlisted commands only</text>
+    <text class="c" x="661" y="670">許可したコマンドだけ実行</text>
+  </g>
+  <g class="edge from-muse" data-from="Reader" data-to="DB">
+    <path marker-end="url(#arrow-muse)" d="M314 870 V1008"/>
+    <text x="324" y="908">opens read-only</text>
+    <text x="324" y="929">読み取り専用で開く</text>
   </g>
   <g class="edge from-muse" data-from="Answers" data-to="T3">
-    <path marker-end="url(#arrow-muse)" d="M683 678 V812"/>
-    <text x="693" y="712">WebSocket on loopback</text>
-    <text x="693" y="733">ループバックの WebSocket</text>
+    <path marker-end="url(#arrow-muse)" d="M520 870 V1138"/>
+    <text x="530" y="904">WebSocket</text>
+    <text x="530" y="923">on loopback</text>
+    <text x="530" y="945">ループバックの</text>
+    <text x="530" y="964">WebSocket</text>
   </g>
   <g class="edge from-muse" data-from="Answers" data-to="T3CLI">
-    <path marker-end="url(#arrow-muse)" d="M801 622 H960 V798"/>
-    <text class="e" x="950" y="650">issues its token once</text>
-    <text class="e" x="950" y="671">トークンを発行</text>
+    <path marker-end="url(#arrow-muse)" d="M650 870 V1006"/>
+    <text x="660" y="908">issues its token once</text>
+    <text x="660" y="929">トークンを発行</text>
+  </g>
+  <g class="edge dashed from-muse" data-from="Writer" data-to="T3CLI">
+    <path marker-end="url(#arrow-muse)" d="M815 870 V1006"/>
+    <text x="825" y="904">creates threads,</text>
+    <text x="825" y="923">sends prompts</text>
+    <text x="825" y="945">スレッド作成・</text>
+    <text x="825" y="964">送信</text>
+  </g>
+  <g class="edge from-t3" data-from="T3CLI" data-to="T3">
+    <path marker-end="url(#arrow-t3)" d="M740 1092 V1138"/>
+    <text x="750" y="1112">local session</text>
+    <text x="750" y="1132">ローカルセッション</text>
+  </g>
+  <g class="edge from-t3" data-from="T3" data-to="DB">
+    <path marker-end="url(#arrow-t3)" d="M500 1170 H374"/>
+    <text class="c" x="437" y="1160">reads and writes</text>
+    <text class="c" x="437" y="1191">読み書き</text>
   </g>
   <g class="edge dashed from-old" data-from="Legacy" data-to="DB">
-    <path marker-end="url(#arrow-old)" d="M104 516 V791"/>
-    <text x="114" y="712">out of scope (do not touch)</text>
-    <text x="114" y="733">対象外 (触らない)</text>
+    <path marker-end="url(#arrow-old)" d="M104 808 V1008"/>
+    <text x="114" y="908">out of scope (do not touch)</text>
+    <text x="114" y="929">対象外 (触らない)</text>
   </g>
   <g class="edge from-box" data-from="Mailbox" data-to="Restarter">
-    <path marker-end="url(#arrow-box)" d="M493 262 H274"/>
-    <text class="c" x="383" y="252">restart-trigger not empty</text>
-    <text class="c" x="383" y="283">restart-trigger が空でない</text>
+    <path marker-end="url(#arrow-box)" d="M480 386 H274"/>
+    <text class="c" x="377" y="376">restart-trigger not empty</text>
+    <text class="c" x="377" y="407">restart-trigger が空でない</text>
   </g>
   <g class="edge from-muse" data-from="Restarter" data-to="Bridge">
-    <path marker-end="url(#arrow-muse)" d="M272 322 H620 V402"/>
-    <text class="c" x="383" y="312">kickstart -k, this job only</text>
-    <text class="c" x="383" y="343">このジョブだけ再起動</text>
+    <path marker-end="url(#arrow-muse)" d="M272 446 H600 V526"/>
+    <text class="c" x="377" y="436">kickstart -k, this job only</text>
+    <text class="c" x="377" y="467">このジョブだけ再起動</text>
   </g>
 
   <!-- Outside the Mac -->
   <g id="node-User" class="ext">
-    <rect class="shape" x="130" y="24" width="150" height="72" rx="36"/>
-    <text class="t c" x="205" y="56">User</text>
-    <text class="s c" x="205" y="78">ユーザー</text>
+    <rect class="shape" x="40" y="24" width="150" height="72" rx="36"/>
+    <text class="t c" x="115" y="56">User</text>
+    <text class="s c" x="115" y="78">ユーザー</text>
   </g>
   <g id="node-Muse" class="ext">
-    <rect class="shape" x="498" y="24" width="370" height="72" rx="36"/>
-    <text class="t c" x="683" y="66">Muse</text>
+    <rect class="shape" x="420" y="24" width="310" height="72" rx="36"/>
+    <text class="t c" x="575" y="66">Muse</text>
+  </g>
+  <g id="node-Connector" class="ext">
+    <rect class="shape" x="970" y="24" width="238" height="72" rx="36"/>
+    <text class="t mono c" x="1089" y="47">custom.t3code</text>
+    <text class="s c" x="1089" y="67">custom connector</text>
+    <text class="s c" x="1089" y="86">カスタムコネクタ</text>
+  </g>
+  <g id="node-Relay" class="ext">
+    <rect class="shape" x="860" y="150" width="348" height="124" rx="36"/>
+    <text class="c" x="1034" y="178"><tspan class="t">T3 Connect relay</tspan><tspan class="s" dx="10">T3 Connect リレー</tspan></text>
+    <text class="p c" x="1034" y="202">OAuth authorization code + dynamic registration</text>
+    <text class="p c" x="1034" y="221">OAuth 認可コード＋動的登録</text>
+    <text class="p c" x="1034" y="242">30-day session, mode cap</text>
+    <text class="p c" x="1034" y="261">30 日セッション、モード上限あり</text>
   </g>
 
   <!-- Inside the Mac -->
   <g id="node-Mailbox" class="box">
-    <rect class="shape" x="493" y="204" width="380" height="96" rx="14"/>
-    <text class="c" x="683" y="232"><tspan class="t">File mailbox</tspan><tspan class="s" dx="10">ファイルメールボックス</tspan></text>
-    <text class="p mono c" x="683" y="255">~/t3-muse-bridge</text>
-    <rect class="chip" x="507" y="265" width="136" height="24" rx="6"/>
-    <text class="chip-label mono c" x="575" y="282">restart-trigger</text>
-    <rect class="chip" x="651" y="265" width="64" height="24" rx="6"/>
-    <text class="chip-label mono c" x="683" y="282">inbox</text>
-    <rect class="chip" x="723" y="265" width="64" height="24" rx="6"/>
-    <text class="chip-label mono c" x="755" y="282">outbox</text>
-    <rect class="chip" x="795" y="265" width="64" height="24" rx="6"/>
-    <text class="chip-label mono c" x="827" y="282">done</text>
+    <rect class="shape" x="480" y="328" width="380" height="96" rx="14"/>
+    <text class="c" x="670" y="356"><tspan class="t">File mailbox</tspan><tspan class="s" dx="10">ファイルメールボックス</tspan></text>
+    <text class="p mono c" x="670" y="379">~/t3-muse-bridge</text>
+    <rect class="chip" x="494" y="389" width="136" height="24" rx="6"/>
+    <text class="chip-label mono c" x="562" y="406">restart-trigger</text>
+    <rect class="chip" x="638" y="389" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="670" y="406">inbox</text>
+    <rect class="chip" x="710" y="389" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="742" y="406">outbox</text>
+    <rect class="chip" x="782" y="389" width="64" height="24" rx="6"/>
+    <text class="chip-label mono c" x="814" y="406">done</text>
   </g>
   <g id="node-Bridge" class="muse">
-    <rect class="shape" x="565" y="404" width="236" height="112" rx="12"/>
-    <text class="t mono c" x="683" y="431">bridge.py</text>
-    <text class="s c" x="683" y="453">launchd daemon,</text>
-    <text class="s c" x="683" y="472">allowlist checks</text>
-    <text class="s c" x="683" y="498">launchd 常駐・許可リスト検証</text>
+    <rect class="shape" x="290" y="528" width="520" height="88" rx="12"/>
+    <text class="t mono c" x="550" y="556">bridge.py</text>
+    <text class="s c" x="550" y="580">launchd daemon, allowlist checks</text>
+    <text class="s c" x="550" y="602">launchd 常駐・許可リスト検証</text>
   </g>
   <g id="node-Restarter" class="muse">
-    <rect class="shape" x="48" y="226" width="224" height="112" rx="12"/>
-    <text class="t mono c" x="160" y="253" style="font-size:17px">restart-bridge.sh</text>
-    <text class="s c" x="160" y="275">launchd job,</text>
-    <text class="s c" x="160" y="294">restarts the bridge only</text>
-    <text class="s c" x="160" y="320">ブリッジだけ再起動</text>
+    <rect class="shape" x="48" y="350" width="224" height="112" rx="12"/>
+    <text class="t mono c" x="160" y="377" style="font-size:17px">restart-bridge.sh</text>
+    <text class="s c" x="160" y="399">watchman launchd job,</text>
+    <text class="s c" x="160" y="418">restarts the bridge only</text>
+    <text class="s c" x="160" y="444">番人・ブリッジだけ再起動</text>
   </g>
   <g id="node-Reader" class="muse">
-    <rect class="shape" x="261" y="404" width="160" height="112" rx="12"/>
-    <text class="t mono c" x="341" y="431">t3r.py</text>
-    <text class="s c" x="341" y="453">read</text>
-    <text class="s c" x="341" y="472">読み取り</text>
-    <text class="p mono c" x="341" y="498">~/t3-muse-tools</text>
-  </g>
-  <g id="node-Writer" class="muse">
-    <rect class="shape" x="945" y="404" width="160" height="112" rx="12"/>
-    <text class="t mono c" x="1025" y="431">t3w.py</text>
-    <text class="s c" x="1025" y="453">task requests</text>
-    <text class="s c" x="1025" y="472">タスク依頼</text>
-    <text class="p mono c" x="1025" y="498">~/t3-muse-tools</text>
+    <rect class="shape" x="234" y="696" width="160" height="174" rx="12"/>
+    <text class="t mono c" x="314" y="723">t3r.py</text>
+    <text class="s c" x="314" y="746">read-only DB reads,</text>
+    <text class="s c" x="314" y="765">which the MCP lacks</text>
+    <text class="s c" x="314" y="789">読み取り専用で参照</text>
+    <text class="s c" x="314" y="808">MCP にない DB 参照</text>
+    <text class="p mono c" x="314" y="852">~/t3-muse-tools</text>
   </g>
   <g id="node-Answers" class="muse">
-    <rect class="shape" x="565" y="566" width="236" height="112" rx="12"/>
-    <text class="t mono c" x="683" y="593">t3a.py</text>
-    <text class="s c" x="683" y="615">relays the user's answers</text>
-    <text class="s c" x="683" y="634">ユーザーの回答を中継</text>
-    <text class="p mono c" x="683" y="660">~/t3-muse-tools</text>
+    <rect class="shape" x="414" y="696" width="250" height="174" rx="12"/>
+    <text class="t mono c" x="539" y="723">t3a.py</text>
+    <text class="s c" x="539" y="746">relays only answers the user</text>
+    <text class="s c" x="539" y="765">decided in chat</text>
+    <text class="s c" x="539" y="789">チャットで決めた回答だけを中継</text>
+    <text class="p c" x="539" y="812">approvals need <tspan class="mono">--user-approved</tspan></text>
+    <text class="p c" x="539" y="831">承認は <tspan class="mono">--user-approved</tspan> 必須</text>
+    <text class="p mono c" x="539" y="852">~/t3-muse-tools</text>
+  </g>
+  <g id="node-Writer" class="muse">
+    <rect class="shape" x="684" y="696" width="200" height="174" rx="12"/>
+    <text class="t mono c" x="784" y="723">t3w.py</text>
+    <text class="s c" x="784" y="746">fallback when the MCP</text>
+    <text class="s c" x="784" y="765">is unavailable</text>
+    <text class="s c" x="784" y="789">MCP が使えないときの</text>
+    <text class="s c" x="784" y="808">フォールバック</text>
+    <text class="p mono c" x="784" y="852">~/t3-muse-tools</text>
   </g>
   <g id="node-Legacy" class="old">
-    <rect class="shape" x="32" y="404" width="190" height="112" rx="12"/>
-    <text class="t c" x="127" y="431" style="font-size:16.5px">Existing t3-tots</text>
-    <text class="s c" x="127" y="453">(for Grok)</text>
-    <text class="s c" x="127" y="472">既存 t3-tots (Grok 用)</text>
-    <text class="p mono c" x="127" y="498">~/t3-tots</text>
+    <rect class="shape" x="32" y="696" width="170" height="112" rx="12"/>
+    <text class="t c" x="117" y="723" style="font-size:16.5px">Existing t3-tots</text>
+    <text class="s c" x="117" y="745">(for Grok)</text>
+    <text class="s c" x="117" y="764">既存 t3-tots (Grok 用)</text>
+    <text class="p mono c" x="117" y="790">~/t3-tots</text>
   </g>
   <g id="node-DB" class="t3">
-    <path class="shape" d="M48 802 A196 13 0 0 1 440 802 V892 A196 13 0 0 1 48 892 Z"/>
-    <ellipse class="lid" cx="244" cy="802" rx="196" ry="13"/>
-    <text class="t c" x="244" y="839">T3 Code state DB</text>
-    <text class="s c" x="244" y="860">T3 Code 状態 DB</text>
-    <text class="p mono c" x="244" y="884">~/.t3/userdata/statev2.sqlite</text>
-  </g>
-  <g id="node-T3" class="t3">
-    <rect class="shape" x="598" y="814" width="170" height="68" rx="12"/>
-    <text class="t c" x="683" y="854">T3 Code</text>
+    <path class="shape" d="M48 1020 A162 13 0 0 1 372 1020 V1198 A162 13 0 0 1 48 1198 Z"/>
+    <ellipse class="lid" cx="210" cy="1020" rx="162" ry="13"/>
+    <text class="t c" x="210" y="1094">T3 Code state DB</text>
+    <text class="s c" x="210" y="1115">T3 Code 状態 DB</text>
+    <text class="p mono c" x="210" y="1140">~/.t3/userdata/statev2.sqlite</text>
   </g>
   <g id="node-T3CLI" class="t3">
-    <rect class="shape" x="930" y="800" width="190" height="96" rx="12"/>
-    <text class="t mono c" x="1025" y="829" style="font-size:17px">t3 CLI</text>
-    <text class="s c" x="1025" y="852">bundled with T3 Code</text>
-    <text class="s c" x="1025" y="874">T3 Code 同梱</text>
+    <rect class="shape" x="620" y="1008" width="240" height="84" rx="12"/>
+    <text class="t mono c" x="740" y="1035" style="font-size:17px">t3 CLI</text>
+    <text class="s c" x="740" y="1057">bundled with T3 Code</text>
+    <text class="s c" x="740" y="1079">T3 Code 同梱</text>
+  </g>
+  <g id="node-MCP" class="t3">
+    <rect class="shape" x="900" y="1008" width="296" height="84" rx="12"/>
+    <text class="c" x="1048" y="1035"><tspan class="t">Official MCP server</tspan><tspan class="p mono" dx="10">/mcp</tspan></text>
+    <text class="s c" x="1048" y="1057">on the environment</text>
+    <text class="s c" x="1048" y="1079">環境の公式 MCP サーバー</text>
+  </g>
+  <g id="node-T3" class="t3">
+    <rect class="shape" x="500" y="1140" width="696" height="60" rx="12"/>
+    <text class="c" x="880" y="1176"><tspan class="t">T3 Code server</tspan><tspan class="s" dx="10">T3 Code サーバー</tspan></text>
   </g>
 </svg>
