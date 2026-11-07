@@ -8,7 +8,7 @@ actually needed.
 
 ## Architecture
 
-![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads and waits with t3_thread_wait, which Muse holds until the run is done and re-arms after a timeout. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch). Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
+![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads and waits with t3_thread_wait, which Muse holds until the run is done and re-arms after a timeout. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues and renews through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. The existing t3-tots setup for Grok points at the DB but is out of scope (do not touch). Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
 
 The user talks to Muse, the product. Muse acts as PM and dispatches tasks
 to T3 Code over two paths.
@@ -67,7 +67,7 @@ PAT instead.
 | Path | Contents |
 |---|---|
 | `bridge/` | The always-on Mac bridge (path 2). Receives requests through the file mailbox via the paired device and runs allowlisted commands only (design notes in `bridge/README.md`) |
-| `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `pending` / `answer`) |
+| `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `renew` / `pending` / `answer`) |
 | `skills/t3-muse-starter/` | A custom Muse skill for setting up t3-muse from scratch and running it day to day, with Muse as PM and T3 Code as the implementer |
 
 ## Answering approvals and questions
@@ -79,6 +79,7 @@ orchestration WebSocket API, with a session token limited to
 
 ```sh
 python3 t3a.py issue-token                        # once; prints metadata only
+python3 t3a.py renew                              # replaces the token; prints metadata only
 python3 t3a.py pending                            # every request waiting on a human
 python3 t3a.py answer <request-id> approve --user-approved
 python3 t3a.py answer <request-id> deny --user-approved
@@ -103,8 +104,29 @@ multi-select question, `answer` picks one option. Only `pending`'s
 `answerable: true` entries can be answered.
 
 **Token lifecycle.** The token lasts 90 days, and T3 Code then rejects it
-(`TOKEN_REJECTED`). `issue-token` refuses to overwrite an existing file.
-To reissue or revoke:
+(`TOKEN_REJECTED`). `renew` replaces it through the bridge, and also works
+once it has expired. T3 Code has to be running.
+
+`renew` issues a new token into a 0600 temp file beside the token file,
+lists pending requests with it, renames it over the token file, and only
+then revokes the old session. A failure before the rename leaves the token
+file as it was. Once the rename is done it exits 0, with the new
+`expires_at`, the `previous_expires_at` and one of these:
+
+| `old_session` | Meaning |
+| --- | --- |
+| `revoked` | Revoked, and gone from a fresh `t3 auth session list` |
+| `none_active` | No older `t3-muse` session was active, so nothing needed revoking |
+| `left_active` | Nothing was revoked; `note` gives the reason and the manual steps |
+
+A session is revoked only when its `subject` and `client.label` are both
+`t3-muse`, it was listed before the new token was issued, exactly one new
+session appeared, and exactly one older one is left. If the old token
+names a session, it has to be that one too. `expires_at` is null when the
+lists do not single out the new session.
+
+`issue-token` refuses to overwrite an existing file. When `renew` cannot
+run or the token is no longer wanted, revoke by hand:
 
 ```sh
 ~/.t3/bin/t3 auth session list                    # find the t3-muse session id
@@ -112,6 +134,9 @@ To reissue or revoke:
 rm ~/t3-muse-tools/.t3a-token
 python3 t3a.py issue-token                        # only when reissuing
 ```
+
+After `left_active`, run only the first two lines, and keep the `t3-muse`
+session issued last, because it belongs to the new token.
 
 **Security.**
 

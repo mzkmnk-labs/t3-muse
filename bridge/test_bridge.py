@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -45,8 +46,16 @@ def check_thread_id_validation() -> None:
             assert "valid thread id" in (bridge.validate(argv) or ""), argv
 
 
+def check_renew_validation() -> None:
+    assert bridge.validate(["python3", "t3a.py", "renew"]) is None
+    for extra in (["extra"], ["--ttl", "1d"], [""], ["--user-approved"]):
+        err = bridge.validate(["python3", "t3a.py", "renew", *extra])
+        assert "takes no arguments" in (err or ""), extra
+
+
 def main() -> None:
     check_thread_id_validation()
+    check_renew_validation()
 
     root = Path(tempfile.mkdtemp(prefix="bridge-test-"))
     home = root / "home"
@@ -228,6 +237,8 @@ def main() -> None:
             ["answer", request_id, "nul\x00byte"],
             ["pending", "extra"],
             ["issue-token", "--ttl", "1d"],
+            ["renew", "extra"],
+            ["renew", "--ttl", "1d"],
             ["revoke-token"],
         ]
         for i, args in enumerate(rejected):
@@ -239,6 +250,7 @@ def main() -> None:
         # allowed shapes reach the tool, which reports it has no token yet
         allowed = [
             ["pending"],
+            ["renew"],
             ["answer", request_id, "approve", "--user-approved"],
             ["answer", request_id, "deny", "--user-approved"],
             ["answer", request_id, "use the blue one"],
@@ -290,6 +302,43 @@ def main() -> None:
                                "T3M_T3_HOME": "not-for-t3w"},
                        "argv": ["python3", "t3w.py", "list"]})
         assert r["ok"] and json.loads(r["stdout"])["home"] is None, r
+
+        # renew through the bridge: T3M_T3_HOME reaches it, and with no
+        # server to check against nothing is issued
+        current = "CURRENT-" + sentinel
+        token_file.write_text(current)
+        env_seen.unlink()
+        renew = {"argv": ["python3", "t3a.py", "renew"],
+                 "env": dict(aenv, T3M_DB="not-for-t3a")}
+        r = roundtrip(dict(renew, id="t-arenew-noserver"))
+        assert r["ok"] and r["exit_code"] == 4, r
+        failure = json.loads(r["stderr"])
+        assert failure["error"] == "T3_NOT_RUNNING", r
+        assert str(t3_home) in failure["message"], r
+        assert not env_seen.exists(), "the CLI must not have run"
+        assert token_file.read_text() == current, r
+
+        # with a server that does not answer the check, the CLI does run: the
+        # token stays out of the mailbox and the token file keeps its content
+        (t3_home / "userdata").mkdir()
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        closed_port = probe.getsockname()[1]
+        probe.close()
+        (t3_home / "userdata" / "server-runtime.json").write_text(
+            json.dumps({"host": "127.0.0.1", "port": closed_port}))
+        r = roundtrip(dict(renew, id="t-arenew-nocheck"))
+        assert r["ok"] and r["exit_code"] == 4, r
+        assert json.loads(r["stderr"])["error"] == "T3_NOT_RUNNING", r
+        assert env_seen.read_text() == "", "T3M_DB must not reach t3a"
+        assert token_file.read_text() == current, r
+        assert token_file.stat().st_mode & 0o777 == 0o600, r
+        temp_files = [p.name for p in tools_dir.iterdir()
+                      if p.name.startswith(".t3a-token.")]
+        assert temp_files == [], temp_files
+        for path in [*base.joinpath("outbox").iterdir(),
+                     *base.joinpath("done").iterdir()]:
+            assert sentinel not in path.read_text(), path
 
         print("bridge smoke test: OK")
     finally:

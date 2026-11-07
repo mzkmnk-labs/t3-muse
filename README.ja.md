@@ -7,7 +7,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 
 ## 構成図
 
-![構成図。ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) を経由して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行い、t3_thread_wait で完了を待つ。wait は保持し、タイムアウトしたら張り直す。経路2 (ファイルメールボックス・ブリッジ): Muse がペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py、t3w.py、t3a.py に対して許可したコマンドだけ実行する。t3r.py は MCP にない DB 参照を担い、T3 Code 状態 DB を読み取り専用で開く。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で一度だけ発行したトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問への回答のみで承認には答えられないため、この経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。別に、メールボックスの restart-trigger に置いたファイルで launchd が番人の restart-bridge.sh を起動し、ブリッジのジョブだけを再起動する。](docs/architecture.ja.svg)
+![構成図。ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) を経由して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行い、t3_thread_wait で完了を待つ。wait は保持し、タイムアウトしたら張り直す。経路2 (ファイルメールボックス・ブリッジ): Muse がペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py、t3w.py、t3a.py に対して許可したコマンドだけ実行する。t3r.py は MCP にない DB 参照を担い、T3 Code 状態 DB を読み取り専用で開く。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問への回答のみで承認には答えられないため、この経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。既存 t3-tots (Grok 用) から DB への線は対象外 (触らない)。別に、メールボックスの restart-trigger に置いたファイルで launchd が番人の restart-bridge.sh を起動し、ブリッジのジョブだけを再起動する。](docs/architecture.ja.svg)
 
 ユーザーは製品である Muse と対話し、Muse が PM としてタスクを T3 Code に dispatch する。経路は 2 つある。
 
@@ -39,7 +39,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。必要なもの�
 | パス | 内容 |
 |---|---|
 | `bridge/` | Mac 常駐ブリッジ (経路2)。ペアデバイス経由のファイルメールボックスで、許可リストのコマンドだけを実行する (設計は `bridge/README.md`) |
-| `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `pending` / `answer`) |
+| `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `renew` / `pending` / `answer`) |
 | `skills/t3-muse-starter/` | t3-muse をまっさらな状態からセットアップして日々運用するための Muse 用カスタム skill。Muse が PM、T3 Code が実装を担当する |
 
 ## 承認と質問への回答
@@ -48,6 +48,7 @@ T3 Code の公開 MCP / CLI ではランタイムリクエストに回答でき�
 
 ```sh
 python3 t3a.py issue-token                        # 最初に一度だけ。出力はメタデータのみ
+python3 t3a.py renew                              # トークンを置き換える。出力はメタデータのみ
 python3 t3a.py pending                            # 人の回答を待っているリクエストをすべて表示
 python3 t3a.py answer <request-id> approve --user-approved
 python3 t3a.py answer <request-id> deny --user-approved
@@ -60,7 +61,19 @@ python3 t3a.py answer <request-id> "青い方を使って"
 
 **制限。** 複数の質問を持つリクエストは 1 つのテキストでは答えられないため `MULTI_QUESTION` で拒否する。アプリで回答すること。複数選択の質問では、`answer` で選べる選択肢は 1 つだけ。回答できるのは `pending` で `answerable: true` のものに限る。
 
-**トークンの期限と再発行。** トークンの有効期限は 90 日で、切れると T3 Code が拒否する (`TOKEN_REJECTED`)。`issue-token` は既存のファイルを上書きしない。再発行・失効の手順:
+**トークンの期限と更新。** トークンの有効期限は 90 日で、切れると T3 Code が拒否する (`TOKEN_REJECTED`)。`renew` はブリッジ経由でトークンを置き換える。期限が切れた後でも使える。T3 Code が起動している必要がある。
+
+`renew` は新しいトークンをトークンファイルと同じフォルダの 0600 の一時ファイルへ発行し、そのトークンで pending 一覧を取得してから rename でトークンファイルを置き換え、最後に旧セッションを失効させる。置き換え前に失敗すれば、トークンファイルは元のまま残る。置き換えが済めば終了コードは 0 で、新しい `expires_at`、`previous_expires_at` と、次のいずれかを出力する:
+
+| `old_session` | 意味 |
+| --- | --- |
+| `revoked` | 失効済みで、改めて取得した `t3 auth session list` からも消えている |
+| `none_active` | 有効な古い `t3-muse` セッションがなく、失効させるものがなかった |
+| `left_active` | 何も失効させていない。理由と手動の手順は `note` にある |
+
+失効させるのは、`subject` と `client.label` がともに `t3-muse` で、新しいトークンの発行前から一覧にあり、新しいセッションがちょうど 1 つ増え、古いものがちょうど 1 つ残っている場合だけ。旧トークンからセッションを読み取れるときは、それとも一致しなければならない。一覧から新しいセッションを特定できないとき、`expires_at` は null になる。
+
+`issue-token` は既存のファイルを上書きしない。`renew` を実行できないときやトークンが不要になったときは、手動で失効させる:
 
 ```sh
 ~/.t3/bin/t3 auth session list                    # t3-muse のセッション ID を確認
@@ -68,6 +81,8 @@ python3 t3a.py answer <request-id> "青い方を使って"
 rm ~/t3-muse-tools/.t3a-token
 python3 t3a.py issue-token                        # 再発行するときだけ
 ```
+
+`left_active` の後は最初の 2 行だけを実行し、最後に発行された `t3-muse` セッションは残す。これが新しいトークンのセッションである。
 
 **セキュリティ。**
 

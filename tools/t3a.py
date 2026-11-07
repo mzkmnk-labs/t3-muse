@@ -3,6 +3,7 @@
 
 Subcommands (a JSON result on stdout; errors are one JSON line on stderr):
     python3 t3a.py issue-token
+    python3 t3a.py renew
     python3 t3a.py pending
     python3 t3a.py answer <request-id> <response> [--user-approved]
 
@@ -11,6 +12,16 @@ into a 0600 token file next to this script, so the token never passes
 through this process, and refuses to overwrite an existing file. The
 session lasts 90 days. pending lists every request waiting on a human.
 answer resolves exactly one of them.
+
+renew replaces an existing token. It issues the same session into a 0600
+temp file beside the token file, runs pending with the new token, renames
+the temp file over the token file, and only then revokes the old session.
+A failure before the rename leaves the token file as it was. Once the
+rename is done it exits 0 even if the old session could not be revoked:
+old_session in the result says revoked, none_active or left_active, and
+left_active comes with a note on revoking by hand. It revokes only what
+the session lists prove is the old session, so nothing is revoked when
+they do not.
 
 For approvals <response> is exactly `approve` or `deny`, and
 --user-approved records that the human decided; approve maps to T3's
@@ -43,7 +54,7 @@ Error codes and exit status:
        INVALID_APPROVAL_RESPONSE
     3  NO_TOKEN TOKEN_EXISTS TOKEN_INSECURE TOKEN_REJECTED TOKEN_SCOPE
     4  T3_NOT_RUNNING T3_NOT_LOCAL T3_PROTOCOL
-    5  T3CLI_NOT_FOUND ISSUE_FAILED
+    5  T3CLI_NOT_FOUND ISSUE_FAILED RENEW_FAILED
     6  REQUEST_NOT_FOUND NOT_ANSWERABLE DETAILS_UNAVAILABLE MULTI_QUESTION
        ANSWER_NOT_A_CHOICE DECISION_NOT_OFFERED
     7  SERVER_REJECTED
@@ -58,21 +69,26 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import uuid
 
 DEFAULT_CLI = os.path.expanduser("~/.t3/bin/t3")
 DEFAULT_T3_HOME = os.path.expanduser("~/.t3")
 TOKEN_FILE = ".t3a-token"
+RENEW_TEMP_PREFIX = TOKEN_FILE + ".renew-"
 TOKEN_TTL_DAYS = 90
+SESSION_NAME = "t3-muse"
 ISSUE_ARGS = [
     "auth", "session", "issue",
     "--scope", "orchestration:read",
     "--scope", "orchestration:operate",
     "--ttl", f"{TOKEN_TTL_DAYS}d",
-    "--label", "t3-muse",
-    "--subject", "t3-muse",
+    "--label", SESSION_NAME,
+    "--subject", SESSION_NAME,
     "--token-only",
 ]
+LIST_ARGS = ["auth", "session", "list", "--json"]
+REVOKE_ARGS = ["auth", "session", "revoke"]
 CLI_TIMEOUT = 60
 CONNECT_TIMEOUT = 5
 IO_TIMEOUT = 30
@@ -80,6 +96,7 @@ MAX_MESSAGE_BYTES = 128 * 1024 * 1024
 
 REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9:%_.~-]{0,799}")
 TOKEN_SHAPE = re.compile(r"[\x21-\x7e]+")
+SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
 MAX_ANSWER = 4000
 MAX_SUMMARY = 2000
 USER_APPROVED = "--user-approved"
@@ -92,7 +109,7 @@ LOOPBACK = {"0.0.0.0": "127.0.0.1", "127.0.0.1": "127.0.0.1",
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 OP_CONTINUATION, OP_TEXT, OP_CLOSE, OP_PING, OP_PONG = 0x0, 0x1, 0x8, 0x9, 0xA
 
-USAGE = ("usage: t3a.py issue-token | pending | "
+USAGE = ("usage: t3a.py issue-token | renew | pending | "
          "answer <request-id> <response> [--user-approved]")
 EXIT_CODES = {
     "USAGE": 2, "INVALID_REQUEST_ID": 2, "INVALID_ANSWER": 2,
@@ -100,7 +117,7 @@ EXIT_CODES = {
     "NO_TOKEN": 3, "TOKEN_EXISTS": 3, "TOKEN_INSECURE": 3,
     "TOKEN_REJECTED": 3, "TOKEN_SCOPE": 3,
     "T3_NOT_RUNNING": 4, "T3_NOT_LOCAL": 4, "T3_PROTOCOL": 4,
-    "T3CLI_NOT_FOUND": 5, "ISSUE_FAILED": 5,
+    "T3CLI_NOT_FOUND": 5, "ISSUE_FAILED": 5, "RENEW_FAILED": 5,
     "REQUEST_NOT_FOUND": 6, "NOT_ANSWERABLE": 6, "DETAILS_UNAVAILABLE": 6,
     "MULTI_QUESTION": 6, "ANSWER_NOT_A_CHOICE": 6, "DECISION_NOT_OFFERED": 6,
     "SERVER_REJECTED": 7,
@@ -120,19 +137,16 @@ def token_path() -> str:
 
 # --- issue-token ---------------------------------------------------------
 
-def issue_token() -> dict:
+def t3_cli() -> str:
     cli = os.environ.get("T3M_T3CLI", DEFAULT_CLI)
     if not os.path.isfile(cli) or not os.access(cli, os.X_OK):
         raise T3aError("T3CLI_NOT_FOUND",
                        f"t3 CLI not found or not executable: {cli}")
-    path = token_path()
-    try:
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
-        raise T3aError("TOKEN_EXISTS",
-                       f"{path} already exists. To reissue, revoke the old "
-                       "session (t3 auth session list, then t3 auth session "
-                       "revoke <id>), delete the file, and run this again.")
+    return cli
+
+
+def write_issued_token(cli: str, fd: int) -> None:
+    """Issue a session with the CLI's stdout going straight into fd."""
     try:
         # The file is the CLI's stdout. Its stderr is discarded rather than
         # relayed: nothing it prints may reach the bridge's captured output.
@@ -141,34 +155,47 @@ def issue_token() -> dict:
                               timeout=CLI_TIMEOUT)
         written = os.fstat(fd).st_size
     except (OSError, subprocess.TimeoutExpired) as e:
-        os.unlink(path)
         raise T3aError("ISSUE_FAILED",
-                       f"t3 CLI did not finish ({type(e).__name__}). If a "
-                       "t3-muse session now shows in t3 auth session list, "
-                       "revoke it.")
+                       f"t3 CLI did not finish ({type(e).__name__}).")
+    if proc.returncode != 0 or written == 0:
+        raise T3aError("ISSUE_FAILED",
+                       f"t3 CLI exited {proc.returncode} and wrote {written} "
+                       "bytes.")
+
+
+def issue_token() -> dict:
+    cli = t3_cli()
+    path = token_path()
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        raise T3aError("TOKEN_EXISTS",
+                       f"{path} already exists. To replace it, run t3a.py "
+                       "renew.")
+    try:
+        write_issued_token(cli, fd)
+    except T3aError as e:
+        os.unlink(path)
+        raise T3aError(e.code,
+                       f"{e.message} No token was saved. Run t3 auth session "
+                       "issue by hand to see its error, and if a t3-muse "
+                       "session now shows in t3 auth session list, revoke it.")
     finally:
         os.close(fd)
-    if proc.returncode != 0 or written == 0:
-        os.unlink(path)
-        raise T3aError("ISSUE_FAILED",
-                       f"t3 CLI exited {proc.returncode} and wrote "
-                       f"{written} bytes; no token was saved. Run t3 auth "
-                       "session issue by hand to see its error.")
     expires = (datetime.datetime.now(datetime.timezone.utc)
                + datetime.timedelta(days=TOKEN_TTL_DAYS))
     return {
         "issued": True,
         "token_path": path,
         "expires_at": expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "note": (f"The token expires after {TOKEN_TTL_DAYS} days. To revoke "
-                 "it: t3 auth session list, then t3 auth session revoke "
-                 "<id>. To reissue: revoke, delete the token file, and run "
-                 "issue-token again."),
+        "note": (f"The token expires after {TOKEN_TTL_DAYS} days. To replace "
+                 "it: t3a.py renew. To revoke it: t3 auth session list, then "
+                 "t3 auth session revoke <id>."),
     }
 
 
-def read_token() -> str:
-    path = token_path()
+def read_token(path: str = None) -> str:
+    path = path or token_path()
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     except FileNotFoundError:
@@ -266,8 +293,7 @@ class WebSocket:
         if status in ("401", "403"):
             raise T3aError("TOKEN_REJECTED",
                            f"T3 Code refused the token (HTTP {status}); it "
-                           "may be expired or revoked. Delete the token file "
-                           "and run t3a.py issue-token")
+                           "may be expired or revoked. Run t3a.py renew")
         if status == "426":
             raise T3aError("T3_PROTOCOL",
                            "this T3 Code no longer speaks orchestration "
@@ -525,8 +551,7 @@ def describe(thread: dict, request: dict, item) -> dict:
     return entry
 
 
-def pending() -> list:
-    token = read_token()
+def list_pending(token: str) -> list:
     host, port = server_address()
     ws = WebSocket.connect(host, port, token)
     try:
@@ -534,6 +559,10 @@ def pending() -> list:
         return [describe(*found) for found in iter_pending(rpc)]
     finally:
         ws.close()
+
+
+def pending() -> list:
+    return list_pending(read_token())
 
 
 # --- answer --------------------------------------------------------------
@@ -650,15 +679,226 @@ def answer(args: list) -> dict:
     return result
 
 
+# --- renew ---------------------------------------------------------------
+
+def muse_sessions(cli: str):
+    """Return {session id: expiry} for the sessions named t3-muse.
+
+    None means the list could not be read, and so proves nothing. Nothing the
+    CLI prints here is relayed.
+    """
+    try:
+        proc = subprocess.run([cli] + LIST_ARGS, stdin=subprocess.DEVNULL,
+                              capture_output=True, text=True,
+                              timeout=CLI_TIMEOUT)
+        rows = json.loads(proc.stdout)
+        if proc.returncode != 0 or not isinstance(rows, list):
+            return None
+        sessions = {}
+        for row in rows:
+            label = (row.get("client") or {}).get("label")
+            if row.get("subject") == SESSION_NAME and label == SESSION_NAME:
+                if not SESSION_ID.fullmatch(row["sessionId"]):
+                    return None
+                sessions[row["sessionId"]] = row.get("expiresAt")
+    except (OSError, subprocess.TimeoutExpired, AttributeError, KeyError,
+            TypeError, ValueError):
+        return None
+    return sessions
+
+
+def new_session_id(before, after):
+    """The one session that appeared since before, or None if not just one."""
+    if before is None or after is None:
+        return None
+    new = [session_id for session_id in after if session_id not in before]
+    return new[0] if len(new) == 1 else None
+
+
+def token_session_id(token: str):
+    """The session id a token names, or None when it cannot be read.
+
+    T3 does not publish this format, so it is only used to refuse a revoke,
+    never to choose what to revoke.
+    """
+    try:
+        payload = token.split(".")[0]
+        padded = payload + "=" * (-len(payload) % 4)
+        session_id = json.loads(base64.urlsafe_b64decode(padded))["sid"]
+    except (KeyError, TypeError, ValueError):
+        return None
+    return session_id if isinstance(session_id, str) else None
+
+
+def revoke_session(cli: str, session_id: str) -> bool:
+    """Revoke a session and say whether it has left the session list.
+
+    The list decides, because the CLI also exits 0 when it found nothing to
+    revoke.
+    """
+    try:
+        subprocess.run([cli] + REVOKE_ARGS + [session_id],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=CLI_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    remaining = muse_sessions(cli)
+    return remaining is not None and session_id not in remaining
+
+
+def remove_stale_temp_files(path: str) -> None:
+    """Clear what a run killed by the bridge's timeout could not clean up."""
+    folder = os.path.dirname(path)
+    for name in os.listdir(folder):
+        if name.startswith(RENEW_TEMP_PREFIX):
+            try:
+                os.unlink(os.path.join(folder, name))
+            except FileNotFoundError:
+                pass
+
+
+def check_new_token(temp: str) -> None:
+    """Prove the new token works. Listing never answers anything."""
+    try:
+        token = read_token(temp)
+    except T3aError:
+        raise T3aError("ISSUE_FAILED",
+                       "the t3 CLI did not print a usable token.")
+    try:
+        list_pending(token)
+    except T3aError as e:
+        raise T3aError(e.code,
+                       f"the new token failed the pending check ({e.code}).")
+    except (OSError, AttributeError, KeyError, TypeError, ValueError) as e:
+        raise T3aError("T3_PROTOCOL",
+                       "the new token failed the pending check "
+                       f"({type(e).__name__}).")
+
+
+def sync_folder(folder: str) -> None:
+    """Make a rename durable; a filesystem that cannot do this is no failure."""
+    try:
+        fd = os.open(folder, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
+def replace_token(cli: str, path: str) -> None:
+    """Issue, check, then rename. The rename is all that ever touches path."""
+    folder = os.path.dirname(path)
+    try:
+        fd, temp = tempfile.mkstemp(prefix=RENEW_TEMP_PREFIX, dir=folder)
+    except OSError as e:
+        raise T3aError("RENEW_FAILED",
+                       f"could not create a temp file ({type(e).__name__}).")
+    try:
+        try:
+            write_issued_token(cli, fd)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        check_new_token(temp)
+        os.replace(temp, path)
+    except OSError as e:
+        raise T3aError("RENEW_FAILED",
+                       "could not put the new token in place "
+                       f"({type(e).__name__}).")
+    finally:
+        try:
+            os.unlink(temp)
+        except OSError:
+            pass
+    # The revoke that follows cannot be undone, so the rename must last first.
+    sync_folder(folder)
+
+
+def discard_new_session(cli: str, before) -> str:
+    """Revoke the session of a token that was thrown away.
+
+    Left active, it would also count as a second old session in the next renew
+    and stop that run from revoking anything.
+    """
+    after = muse_sessions(cli)
+    if before is not None and after is not None and set(after) <= set(before):
+        return "No new session was left behind."
+    new = new_session_id(before, after)
+    if new is not None and revoke_session(cli, new):
+        return "The new session was revoked."
+    return ("A new t3-muse session may be left behind with its token already "
+            "discarded. To revoke it by hand on the Mac: t3 auth session "
+            "list, then t3 auth session revoke <id> for the t3-muse session "
+            "issued last; an older one belongs to the token file.")
+
+
+def retire_old_session(cli: str, before, old_token_session) -> dict:
+    """Revoke the old session if the lists prove which one it is.
+
+    Only a session listed before this run issued anything can be revoked here,
+    so the new session is never a candidate.
+    """
+    after = muse_sessions(cli)
+    new = new_session_id(before, after)
+    if new is None:
+        result = {"expires_at": None}
+        reason = "the session lists do not single out the new session"
+    else:
+        result = {"expires_at": after[new]}
+        old = [session_id for session_id in before if session_id in after]
+        if not old:
+            return dict(result, old_session="none_active")
+        if len(old) == 1:
+            result["previous_expires_at"] = before[old[0]]
+        if len(old) > 1:
+            reason = f"{len(old)} older t3-muse sessions are active"
+        elif old_token_session not in (None, old[0]):
+            reason = "the older t3-muse session is not the old token's"
+        elif revoke_session(cli, old[0]):
+            return dict(result, old_session="revoked")
+        else:
+            reason = "the session list did not confirm the revoke"
+    return dict(
+        result, old_session="left_active",
+        note=(f"The old t3-muse session was not revoked ({reason}); treat it "
+              "as still active. To revoke it by hand on the Mac: t3 auth "
+              "session list, then t3 auth session revoke <id> for each "
+              "t3-muse session except the one issued last, which belongs to "
+              "the new token."))
+
+
+def renew() -> dict:
+    # A token that has expired still passes this; it only proves the file is
+    # there and safe. Checking the server first keeps a run that cannot verify
+    # anything from issuing a session.
+    old_token = read_token()
+    cli = t3_cli()
+    server_address()
+    path = token_path()
+    remove_stale_temp_files(path)
+    before = muse_sessions(cli)
+    try:
+        replace_token(cli, path)
+    except T3aError as e:
+        raise T3aError(e.code,
+                       f"{e.message} The token file was not changed. "
+                       f"{discard_new_session(cli, before)}")
+    return dict({"renewed": True},
+                **retire_old_session(cli, before, token_session_id(old_token)))
+
+
 # --- entry point ---------------------------------------------------------
 
 def run(args: list):
     command, rest = (args[0], args[1:]) if args else (None, [])
     if command == "answer":
         return answer(rest)
-    if rest or command not in ("issue-token", "pending"):
+    commands = {"issue-token": issue_token, "renew": renew, "pending": pending}
+    if rest or command not in commands:
         raise T3aError("USAGE", USAGE)
-    return issue_token() if command == "issue-token" else pending()
+    return commands[command]()
 
 
 def main(argv: list) -> int:

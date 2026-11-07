@@ -11,8 +11,9 @@ Design rules:
   t3r.py (schema / health / status), our task writer t3w.py
   (start / send / show / list — the only write path, run solely for
   requests the user asked Muse to make), and our answer relay t3a.py
-  (issue-token / pending / answer — only relays decisions the user made;
-  approvals need --user-approved). No arbitrary shell, no other programs.
+  (issue-token / renew / pending / answer — only relays decisions the user
+  made; approvals need --user-approved). No arbitrary shell, no other
+  programs.
 - Every request and result is archived under done/ for audit.
 """
 import json
@@ -39,7 +40,7 @@ ENV_WHITELIST = {"T3M_DB", "T3M_T3CLI"}
 THREAD_ID = re.compile(r"^(?:mcp:)?[0-9a-fA-F-]{32,40}\Z")
 SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
 MAX_MESSAGE = 20_000
-T3A_SUBCOMMANDS_NO_ARGS = {"issue-token", "pending"}
+T3A_SUBCOMMANDS_NO_ARGS = {"issue-token", "pending", "renew"}
 T3A_ENV_WHITELIST = {"T3M_T3CLI", "T3M_T3_HOME"}
 REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9:%_.~-]{0,799}")
 APPROVAL_RESPONSES = {"approve", "deny"}
