@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """T3 Bridge daemon for Muse (Mac side).
 
-Watches ~/t3-tots-bridge/inbox/ for request JSON files placed there through
+Watches ~/t3-muse-bridge/inbox/ for request JSON files placed there through
 the user's Muse device channel, runs allowlisted T3 tool commands, and
-writes results to ~/t3-tots-bridge/outbox/<id>.json.
+writes results to ~/t3-muse-bridge/outbox/<id>.json.
 
 Design rules:
 - No network listener. The only input is local files in the inbox folder.
@@ -23,7 +23,7 @@ import sys
 import time
 import traceback
 
-BASE = os.path.expanduser("~/t3-tots-bridge")
+BASE = os.path.expanduser("~/t3-muse-bridge")
 INBOX = os.path.join(BASE, "inbox")
 OUTBOX = os.path.join(BASE, "outbox")
 DONE = os.path.join(BASE, "done")
@@ -36,7 +36,7 @@ MAX_OUTPUT = 200_000  # bytes per stream
 READER_SUBCOMMANDS = {"schema", "health", "status"}
 WRITER_SUBCOMMANDS = {"start", "send", "show", "list", "add-project"}
 ENV_WHITELIST = {"T3M_DB", "T3M_T3CLI"}
-THREAD_ID = re.compile(r"^[0-9a-fA-F-]{32,40}$")
+THREAD_ID = re.compile(r"^(?:mcp:)?[0-9a-fA-F-]{32,40}\Z")
 SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
 MAX_MESSAGE = 20_000
 T3A_SUBCOMMANDS_NO_ARGS = {"issue-token", "pending"}

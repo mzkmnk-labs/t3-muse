@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 950" width="1160" height="950" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse architecture / t3-muse 構成図</title>
-  <desc id="desc">User sends requests and approvals to Claude. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Claude. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope.</desc>
+  <desc id="desc">User sends requests and approvals to Muse. Muse writes request JSON to the file mailbox on the Mac Studio through the device channel, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only: t3r.py opens the T3 Code state DB read-only, and t3w.py creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3a.py relays the user's answers to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues once through the t3 CLI. T3 Code reads and writes the DB. The existing t3-tots setup for Grok is out of scope.</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -125,7 +125,7 @@
   </g>
 
   <!-- Edges: data-from and data-to use the node ids below; each arrow points at data-to -->
-  <g class="edge from-ext" data-from="User" data-to="Claude">
+  <g class="edge from-ext" data-from="User" data-to="Muse">
     <path marker-end="url(#arrow-ext)" d="M280 60 H496"/>
     <text class="c" x="388" y="50">requests, approvals</text>
     <text class="c" x="388" y="81">依頼・承認</text>
@@ -135,7 +135,7 @@
     <text x="803" y="130">writes request JSON via the device channel</text>
     <text x="803" y="151">デバイスチャネルでリクエスト JSON を書く</text>
   </g>
-  <g class="edge from-box" data-from="Mailbox" data-to="Claude">
+  <g class="edge from-box" data-from="Mailbox" data-to="Muse">
     <path marker-end="url(#arrow-box)" d="M573 204 V98"/>
     <text class="e" x="563" y="130">returns result JSON</text>
     <text class="e" x="563" y="151">結果 JSON を返す</text>
@@ -206,20 +206,16 @@
     <text class="t c" x="205" y="56">User</text>
     <text class="s c" x="205" y="78">ユーザー</text>
   </g>
-  <g id="node-Claude" class="ext">
-    <rect class="shape" x="498" y="24" width="150" height="72" rx="36"/>
-    <text class="t c" x="573" y="66">Claude</text>
-  </g>
   <g id="node-Muse" class="ext">
-    <rect class="shape" x="718" y="24" width="150" height="72" rx="36"/>
-    <text class="t c" x="793" y="66">Muse</text>
+    <rect class="shape" x="498" y="24" width="370" height="72" rx="36"/>
+    <text class="t c" x="683" y="66">Muse</text>
   </g>
 
   <!-- Inside the Mac -->
   <g id="node-Mailbox" class="box">
     <rect class="shape" x="493" y="204" width="380" height="96" rx="14"/>
     <text class="c" x="683" y="232"><tspan class="t">File mailbox</tspan><tspan class="s" dx="10">ファイルメールボックス</tspan></text>
-    <text class="p mono c" x="683" y="255">~/t3-tots-bridge</text>
+    <text class="p mono c" x="683" y="255">~/t3-muse-bridge</text>
     <rect class="chip" x="556" y="265" width="78" height="24" rx="6"/>
     <text class="chip-label mono c" x="595" y="282">inbox</text>
     <rect class="chip" x="644" y="265" width="78" height="24" rx="6"/>

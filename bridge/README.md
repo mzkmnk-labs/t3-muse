@@ -11,9 +11,9 @@ SSH over Tailscale の代替として作る、Mac Studio 常駐の実行ブリ�
 ## 構成
 
 ```
-Muse ──(デバイスチャネル: ファイル書込)──▶ ~/t3-tots-bridge/inbox/<id>.json
+Muse ──(デバイスチャネル: ファイル書込)──▶ ~/t3-muse-bridge/inbox/<id>.json
 Mac の bridge.py (launchd 常駐) が検知 → 許可コマンドだけ実行
-Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-tots-bridge/outbox/<id>.json
+Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-muse-bridge/outbox/<id>.json
 処理済みリクエストは done/ に保管 (監査用)
 ```
 
@@ -36,8 +36,8 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-tots-bri
 リポジトリ内の plist は個人パスを含まないよう `__HOME__` プレースホルダで書かれている。
 Mac 側でチェックアウト（ghq 管理なら worktree）から:
 
-1. `mkdir -p ~/t3-tots-bridge/inbox ~/t3-tots-bridge/outbox ~/t3-tots-bridge/done`
-2. `cp bridge/bridge.py ~/t3-tots-bridge/`
+1. `mkdir -p ~/t3-muse-bridge/inbox ~/t3-muse-bridge/outbox ~/t3-muse-bridge/done`
+2. `cp bridge/bridge.py ~/t3-muse-bridge/`
 3. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge.plist > ~/Library/LaunchAgents/com.muse.t3bridge.plist`
 4. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
 5. Muse が `bridge-ping` リクエストで疎通確認
