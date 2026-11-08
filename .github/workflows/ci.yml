@@ -14,6 +14,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
+# bash with -o pipefail, so a failing git ls-files fails the compile check
+# rather than leaving xargs nothing to compile.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     name: test (${{ matrix.name }})
