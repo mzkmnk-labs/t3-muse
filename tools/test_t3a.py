@@ -51,7 +51,7 @@ def session(session_id, subject="t3-muse", label="t3-muse", expires=OLD_EXPIRY):
 
 # Sessions that must survive every renew: other clients, and near misses.
 BYSTANDERS = [
-    session("44444444-4444-4444-8444-444444444444", "t3-tots", "t3-tots"),
+    session("44444444-4444-4444-8444-444444444444", "other-companion", "other-companion"),
     session("55555555-5555-4555-8555-555555555555", "mcp-client", "Muse"),
     session("66666666-6666-4666-8666-666666666666", "t3-muse", "other-label"),
     session("77777777-7777-4777-8777-777777777777", "other-subject", "t3-muse"),

@@ -190,14 +190,14 @@ class InstallerCase(unittest.TestCase):
                          str(stubs / "launchctl"))
         self.assertEqual(shutil.which("xattr", path=self.env["PATH"]), str(stubs / "xattr"))
 
-        # A t3-tots install on the same Mac, which the CLI must never touch.
-        self.tots = self.home / "t3-tots" / "token"
-        self.tots.parent.mkdir()
-        self.tots.write_text("tots-secret")
-        self.addCleanup(self.assert_tots_untouched)
+        # Another companion's install on the same Mac, which the CLI must never touch.
+        self.other_install = self.home / "other-companion" / "token"
+        self.other_install.parent.mkdir()
+        self.other_install.write_text("other-companion-secret")
+        self.addCleanup(self.assert_other_install_untouched)
 
-    def assert_tots_untouched(self):
-        self.assertEqual(self.tots.read_text(), "tots-secret")
+    def assert_other_install_untouched(self):
+        self.assertEqual(self.other_install.read_text(), "other-companion-secret")
 
     def stop_daemons(self):
         for marker in self.state.glob("loaded-*"):
