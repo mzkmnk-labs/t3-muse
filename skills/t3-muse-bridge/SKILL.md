@@ -74,6 +74,8 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 - finished_at is the Mac's local time with its UTC offset.
 
+- When a reply disagrees with this skill, go by the reply and say so in chat.
+
 - A tool file missing from ~/t3-muse-tools shows as ok true with exit_code 2 and python's can't open file message in stderr.
 
 ## Handle a refusal
@@ -294,7 +296,7 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 ## Keep within bounds
 
-- Run only what the allowlist offers. Never place a bridge.py with a wider allowlist, or another program, to get past a refusal. Widening the allowlist is a change to the t3-muse repository through a reviewed pull request, made only when nothing narrower will do.
+- Run only what the allowlist offers. Never place a bridge.py with a wider allowlist, or another program, to get past a refusal. When a task needs a command the allowlist does not offer, tell the user.
 
 - Never open, read, copy or move ~/t3-muse-tools/.t3a-token or the .t3a-token.renew-* temp files beside it. t3a reads the token itself.
 
@@ -305,9 +307,3 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 - Leave done/ and outbox/ as they are. They are the audit record of every request.
 
 - Leave another companion's install on the Mac, and its token, untouched.
-
-## Keep this skill current
-
-- When a reply disagrees with this skill, go by the reply and say so in chat.
-
-- Update this skill in the same pull request as any change to the bridge or the tools that changes something it describes, and keep the copy in the repository in step with the copy Muse loads.

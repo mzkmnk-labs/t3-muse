@@ -12,8 +12,6 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Expect the relay to cut a long held request at around two minutes with an HTTP 524, and design every wait to be re-armed rather than held once for a long stretch.
 
-- Update this skill in the same change whenever you fix a behavior it describes, and keep the copy in the repository in step with the copy Muse loads.
-
 ## Work as PM
 
 - Treat t3-muse as a companion that lets Muse manage work in T3 Code on the user's Mac while T3 Code does the implementation.
@@ -123,16 +121,6 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 - Look up the meaning of a t3r, t3w or t3a reply in the T3 Muse Bridge skill, from the t3r status fields, open mode and source to each error code.
 
 - Never read the authentication tables or the scheduled task webhook secrets in the T3 database.
-
-## Change this repository
-
-- Update docs/architecture.svg, docs/architecture.ja.svg and both README files whenever the architecture changes. README.md and docs/architecture.svg are English, and README.ja.md and docs/architecture.ja.svg are Japanese.
-
-- Keep this skill truthful as the surfaces move. When a T3 Code or Muse update changes a behavior named here, ship the skill correction with the same pull request that adapts to it.
-
-- Keep personal paths and identifiers out of the repository. The plists keep the __HOME__ placeholder and expansion happens only at install time on the Mac.
-
-- Write original code only. Do not port or closely copy any other companion implementation, even where a license would allow it.
 
 ## Available connectors
 
