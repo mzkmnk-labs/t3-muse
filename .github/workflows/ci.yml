@@ -5,38 +5,133 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run. Pushes to main get a
+# group of their own each, so none of them is ever cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+# bash with -o pipefail, so a failing git ls-files fails the compile check
+# rather than leaving xargs nothing to compile.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The newest stable Python.
+          - name: Ubuntu, Python 3.15
+            os: ubuntu-26.04
+            python: "3.15"
+          # /usr/bin/python3 is what the bridge and the tools run on in
+          # production, so it sets the floor.
+          - name: macOS, system Python
+            os: macos-26
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: System Python
+        if: runner.os == 'macOS'
+        run: |
+          /usr/bin/python3 --version
+          /usr/bin/python3 - <<'EOF'
+          import sys
+          version = sys.version_info[:2]
+          if version < (3, 9):
+              sys.exit(f"/usr/bin/python3 is {sys.version.split()[0]}, below the 3.9 floor")
+          if version != (3, 9):
+              print(f"::warning title=System Python::/usr/bin/python3 is {sys.version.split()[0]}, not 3.9")
+          EOF
+          # The runner's own python3 is Homebrew's, so put the system one first
+          # for the tests and for the tools the bridge starts.
+          which -a python3
+          echo /usr/bin >> "$GITHUB_PATH"
+          # Apple's Python writes bytecode under $HOME/Library/Caches/com.apple.python.
+          echo PYTHONDONTWRITEBYTECODE=1 >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
         with:
-          python-version: "3.12"
-      - uses: actions/setup-node@v4
+          # The skill audit compares with origin/main.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        if: runner.os == 'Linux'
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
+      - name: Python in use
+        run: |
+          command -v python3
+          python3 --version
+          if [ "$RUNNER_OS" = macOS ] && [ "$(command -v python3)" != /usr/bin/python3 ]; then
+            echo "::error title=Python in use::python3 is not /usr/bin/python3"
+            exit 1
+          fi
       - name: Compile check
-        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py bridge/test_restarter.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py .claude/hooks/skill_audit.py .claude/hooks/test_skill_audit.py installer/test_t3_muse.py
+        run: git ls-files -z '*.py' | xargs -0 python3 -m py_compile
+      - name: Test list check
+        # Every tracked test file needs a "run: python3 <file>" step below.
+        run: |
+          python3 - <<'EOF'
+          import fnmatch, re, subprocess, sys
+          from pathlib import PurePosixPath
+
+          def is_test(path):
+              name = PurePosixPath(path).name
+              return fnmatch.fnmatchcase(name, "test_*.py") or fnmatch.fnmatchcase(name, "*_test.py")
+
+          listed = subprocess.run(["git", "ls-files", "-z", "*.py"], capture_output=True,
+                                  text=True, check=True).stdout
+          tracked = {path for path in listed.split("\0") if path and is_test(path)}
+          with open(".github/workflows/ci.yml") as workflow:
+              steps = re.findall(r"^ +run: python3 (\S+)$", workflow.read(), re.M)
+          run = {path for path in steps if is_test(path)}
+          for path in sorted(tracked - run):
+              print(f"::error title=Test list check::{path} is tracked, but no step runs it")
+          for path in sorted(run - tracked):
+              print(f"::error title=Test list check::a step runs {path}, which is not tracked")
+          sys.exit(1 if tracked != run else 0)
+          EOF
       - name: Installer syntax check
         run: node --check installer/t3-muse.js
       - name: Plist sanity check
         run: |
-          python -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge.plist','rb'))"
-          python -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge-restarter.plist','rb'))"
+          python3 -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge.plist','rb'))"
+          python3 -c "import plistlib; plistlib.load(open('bridge/com.muse.t3bridge-restarter.plist','rb'))"
       - name: Shell syntax check
         run: sh -n bridge/restart-bridge.sh
       - name: Bridge smoke test
-        run: python bridge/test_bridge.py
+        run: python3 bridge/test_bridge.py
       - name: Restarter tests
-        run: python bridge/test_restarter.py
+        run: python3 bridge/test_restarter.py
       - name: Reader unit tests
-        run: python tools/test_t3r.py
+        run: python3 tools/test_t3r.py
       - name: Writer unit tests
-        run: python tools/test_t3w.py
+        run: python3 tools/test_t3w.py
       - name: Answer relay unit tests
-        run: python tools/test_t3a.py
+        run: python3 tools/test_t3a.py
       - name: Skill audit unit tests
-        run: python .claude/hooks/test_skill_audit.py
+        run: python3 .claude/hooks/test_skill_audit.py
       - name: Installer dry-run test
-        run: python installer/test_t3_muse.py
+        run: python3 installer/test_t3_muse.py
+      - name: Skill audit
+        # Advisory: drift, or an audit that could not run, is a warning and
+        # never fails the job.
+        if: github.event_name == 'pull_request' && runner.os == 'Linux'
+        run: |
+          status=0
+          python3 .claude/hooks/skill_audit.py --check || status=$?
+          case $status in
+            0) ;;
+            1) echo "::warning title=Skill audit::A path the skills describe changed, but neither SKILL.md did. See this step's log." ;;
+            *) echo "::warning title=Skill audit::The audit could not run (exit $status). See this step's log." ;;
+          esac

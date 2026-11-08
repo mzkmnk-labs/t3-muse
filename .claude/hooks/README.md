@@ -76,6 +76,8 @@ python3 .claude/hooks/skill_audit.py --check
 
 Exit 0 means no drift, and exit 1 means drift. Exit 2 means a usage error, or that the audit couldn't run, for example because `origin/main` is missing.
 
+CI runs the same check on pull requests, as the last step of the Ubuntu job. It only advises there too: drift (exit 1), or an audit that couldn't run (exit 2), shows as a warning annotation, and the job still passes.
+
 ## Things to know
 
 - It doesn't run `git fetch`. It uses the local `origin/main` as the base, so when that is stale it can count changes that already landed on main as changes on the branch.
