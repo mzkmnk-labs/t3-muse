@@ -144,7 +144,7 @@ class AuditedCommandTests(unittest.TestCase):
     def test_pr_create_family(self):
         for command in (
             "gh pr create --fill",
-            "agent-auth gh pr create --title x --body-file body.md",
+            "wrapper gh pr create --title x --body-file body.md",
             "git push -u origin x && gh pr create --fill",
         ):
             with self.subTest(command=command):
@@ -447,7 +447,7 @@ class CommandLineTests(RepoTestCase):
         # project dir pointing at this repository and its copy of the script.
         self.make_drift()
         env = {**GIT_ENV, "CLAUDE_PROJECT_DIR": str(self.root)}
-        commands = {"commit": HEREDOC_COMMIT, "pr-create": "agent-auth gh pr create --fill"}
+        commands = {"commit": HEREDOC_COMMIT, "pr-create": "wrapper gh pr create --fill"}
         for event, handler in registered_handlers():
             if event == "PostToolUse":
                 payload = {"tool_input": {"command": commands[handler_family(handler)]}}

@@ -30,8 +30,8 @@ GIT_TIMEOUT_SECONDS = 10
 # The commands worth an audit once they succeed, by family. settings.json gives
 # each family its own PostToolUse handler, whose "if" is Bash(<pattern>) and
 # whose command passes the family name; a test keeps the two in step. Each
-# pattern starts with "*" so that a wrapper in front, such as "agent-auth gh",
-# still matches, and "*git *commit*" also covers "git -C <dir> commit".
+# pattern starts with "*" so that a wrapper in front of git or gh still
+# matches, and "*git *commit*" also covers "git -C <dir> commit".
 AUDITED_COMMANDS = {
     "commit": "*git *commit*",
     "pr-create": "*gh pr create*",

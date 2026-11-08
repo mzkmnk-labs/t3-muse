@@ -25,9 +25,9 @@ Claude Code の規約どおり、スクリプトは `.claude/hooks/` に置き�
 
 以前は全 Bash 呼び出しで python を起動し、スクリプトの中でコマンド文字列の部分一致を見ていました。いまは handler の `if` で、Claude Code が python を起動する前に絞り込みます。`if` には1つの handler に1つのルールしか書けないので、コミット用と PR 作成用に handler を2つ置いています。
 
-- パターンの先頭の `*` は、前に付くラッパーのためです。実測では、`Bash(gh pr create *)` は `agent-auth gh pr create` に一致しませんでした。`Bash(git commit *)` も `timeout 30 git commit` や `nohup git commit` に一致しませんでした。ドキュメントにある permission rule のラッパー除去は、`if` では効きません。
+- パターンの先頭の `*` は、前に付くラッパーのためです。実測では、`Bash(gh pr create *)` は `wrapper gh pr create` のようにラッパーを前に付けた形に一致しませんでした。`Bash(git commit *)` も `timeout 30 git commit` や `nohup git commit` に一致しませんでした。ドキュメントにある permission rule のラッパー除去は、`if` では効きません。
 - `*git *commit*` は、旧実装の部分一致が取りこぼしていた `git -C <dir> commit`、`git -c k=v commit`、`git --no-pager commit` も拾います。`/usr/bin/git commit`、`sh -c 'git commit ...'`、`nohup git commit` も一致します。どれも 2.1.319 で実測しました。
-- スクリプトも、同じパターンでコマンド全文を確かめます。ドキュメントのとおり `if` は best-effort で、`$()` やバッククォートを含むコマンドでは、プログラム名より多くを指定したパターンの handler がすべて起動します。Claude の標準的なコミット `git commit -m "$(cat <<'EOF' ... )"` もこれに当たります。各 handler は自分のファミリー名を渡し、スクリプトはそのファミリーのパターンだけを見ます。そのため、1回のコミットで出る監査は1回です。
+- スクリプトも、同じパターンでコマンド全文を確かめます。ドキュメントのとおり `if` は best-effort で、`$()` やバッククォートを含むコマンドでは、プログラム名より多くを指定したパターンの handler がすべて起動します。`$PWD` のような変数を含むコマンドでも起動することがあります。Claude の標準的なコミット `git commit -m "$(cat <<'EOF' ... )"` もこれに当たります。各 handler は自分のファミリー名を渡し、スクリプトはそのファミリーのパターンだけを見ます。そのため、1回のコミットで出る監査は1回です。
 - パターン表はスクリプトの `AUDITED_COMMANDS` にあります。`settings.json` の `if` と一致していることはテストで確かめています。ファミリー名を省いた `--hook post-tool` は、全ファミリーを見ます。
 
 Claude Code 2.1.319 で実測した挙動です。
@@ -36,7 +36,7 @@ Claude Code 2.1.319 で実測した挙動です。
 | --- | --- | --- |
 | `git add -A && git commit -m "$(cat <<'MSG' ... )"` | commit | 監査1回 |
 | `git -C "$PWD" commit ...` | commit、pr-create | commit 側だけが監査を出す |
-| `gh pr create --fill`、`agent-auth gh pr create --fill` | pr-create | 監査1回 |
+| `gh pr create --fill`、`wrapper gh pr create --fill` | pr-create | 監査1回 |
 | `echo $(date)` | commit、pr-create | どちらも無言 |
 | `echo "$HOME"`、`git status`、`ls` | なし | なし |
 | `git status; echo commit` | なし（サブコマンド単位で判定される） | なし |
