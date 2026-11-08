@@ -54,7 +54,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Build one watcher for each project goal, the first time a liveness check finds that the goal has none. When the goal has one that is disabled, re-enable it rather than building a second.
 
-- The watcher is a cron owned by the project goal that runs every two minutes. Each run reads t3r status once through the bridge, keeps only the threads of the goal's T3 project, compares them with the watcher's state file, and posts new completions, new failures and newly pending approvals and questions to the chat where you work with the user. Then it saves what it saw. A run with nothing new posts nothing. It only reads and reports. Starting threads, relaying answers and merging stay in this chat, where the user decides.
+- The watcher is a cron owned by the project goal that runs every two minutes. Each run reads t3r status once through the bridge, keeps only the threads of the goal's T3 project, the seeded ones and any other of the project's threads that is waiting, compares them with the watcher's state file, and posts new completions, new failures and newly pending approvals and questions to the chat where you work with the user. Then it saves what it saw. A run with nothing new posts nothing. It only reads and reports. Starting threads, relaying answers and merging stay in this chat, where the user decides.
 
 - The rules it follows are the ones in Monitor, report and merge. The prompt below spells them out, so a run needs nothing from this chat.
 
@@ -80,7 +80,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 | `latest_user_message_at` | null, or the thread's latest_user_message_at from the last status read, recorded when you re-seed an ended entry before a follow up |
 
 - Fill these placeholders in the prompt with this environment's values:
-  - `<project title>` is the T3 project's title, as the project_title field in t3r status gives it. That field is the only project field status has.
+  - `<project title>` is the T3 project's title, as the project_title field in t3r status gives it. That field is the only project field status has, and the watcher uses it only for threads that have no entry yet, so a renamed project does not hide the seeded ones.
   - `<project id>` is the T3 project id, which the MCP thread list takes for the fallback.
   - `<state file>` is the state file's path.
   - `<repository>` is the GitHub owner and repository of the project, for the pull request lookup.
@@ -110,7 +110,7 @@ You are <watcher name>, the t3-muse watcher for the T3 project <project title>. 
 
 3. If the bridge gave no usable reply, list the threads of the T3 project <project id> with the T3 MCP connector instead, subagent threads included. Read a waiting status there as a pending request. If that fails too, change nothing, post nothing and stop.
 
-4. Keep only the threads of <project title>. A run status of preparing, queued, starting, running or waiting means the thread is in flight. Completed, failed, interrupted, cancelled and rolled_back mean its run has ended. Idle means no run is recorded yet. A thread with a pending approval or question counts as waiting, whatever its run status.
+4. Take every thread that has an entry in the state file, wherever status lists it, because the main chat seeds only this project's threads. Take a thread with no entry only when its project_title is <project title>. A run status of preparing, queued, starting, running or waiting means the thread is in flight. Completed, failed, interrupted, cancelled and rolled_back mean its run has ended. Idle means no run is recorded yet. A thread with a pending approval or question counts as waiting, whatever its run status.
 
 5. Update each thread entry in the state file:
    - Waiting: unless the entry is waiting with reported true, report the pending approval or question and save waiting with reported true.
