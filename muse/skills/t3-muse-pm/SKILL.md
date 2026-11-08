@@ -50,13 +50,93 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - When t3a pending or answer returns TOKEN_REJECTED, the approval token has expired or been revoked. Renew it as Keep the credentials current describes, then relay the user's answer again.
 
+## Build the watcher
+
+- Build one watcher for each project goal, the first time a liveness check finds that the goal has none. When the goal has one that is disabled, re-enable it rather than building a second.
+
+- The watcher is a cron owned by the project goal that runs every two minutes. Each run reads t3r status once through the bridge, keeps only the threads of the goal's T3 project, compares them with the watcher's state file, and posts new completions, new failures and newly pending approvals and questions to the chat where you work with the user. Then it saves what it saw. A run with nothing new posts nothing. It only reads and reports. Starting threads, relaying answers and merging stay in this chat, where the user decides.
+
+- The rules it follows are the ones in Monitor, report and merge. The prompt below spells them out, so a run needs nothing from this chat.
+
+- Keep the state file where every run and every later chat can find it, such as a t3-muse folder in the project goal's workspace, with one file per project. Write its path and the cron's name and id into the record this environment keeps across chats, next to the two clocks in Keep the credentials current.
+
+- Write the state file before you create the cron, starting from an empty threads object. With one thread seeded it looks like this:
+
+```json
+{
+  "idle_runs": 0,
+  "threads": {
+    "<thread id>": {"status": "running", "reported": false, "latest_user_message_at": null}
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `idle_runs` | How many idle runs have come in a row. A run that is not idle sets it to 0, and the watcher disables its cron when it reaches 15. Set it back to 0 whenever you re-enable the cron |
+| `threads` | One entry per watched thread, keyed by its thread_id from t3r status |
+| `status` | What the entry last recorded: running for a thread in flight, waiting for one with a pending approval or question, or the status its run ended with, such as completed or failed |
+| `reported` | true once the waiting or ended status in the entry has been posted to the chat, and false while the thread runs |
+| `latest_user_message_at` | null, or the thread's latest_user_message_at from the last status read, recorded when you re-seed an ended entry before a follow up |
+
+- Fill these placeholders in the prompt with this environment's values:
+  - `<project title>` is the T3 project's title, as the project_title field in t3r status gives it. That field is the only project field status has.
+  - `<project id>` is the T3 project id, which the MCP thread list takes for the fallback.
+  - `<state file>` is the state file's path.
+  - `<repository>` is the GitHub owner and repository of the project, for the pull request lookup.
+  - `<chat>` is the chat where you and the user work on this project.
+  - `<watcher name>` is the name you give the cron, such as t3-muse watcher followed by the project title, so a run and a later chat can find it.
+
+- Create the cron with this environment's scheduling tool. Set it to run every two minutes, `*/2 * * * *` in cron syntax, and make the project goal its owner, so it belongs to the work it watches rather than to one chat. Deliver its results to `<chat>`, so a pending approval reaches the person who decides it. Give it the filled prompt.
+
+- A run needs the paired Mac device channel for the bridge, the T3 MCP connector for the fallback and the GitHub connector for the pull request lookup. When the scheduling tool asks which tools a run may use, grant those three.
+
+- Find out how the scheduling tool lets a run end without posting, and word the prompt's no-report step to match. A watcher that posts every two minutes buries the reports that matter.
+
+- Re-check the status values in the prompt against the status values in the server tool list's thread list schema when you build. They come from the build this skill was verified against.
+
+- Seed the target threads once the cron exists, as the liveness check describes. Check the scheduling tool's run history after the first run, and fix the prompt if that run failed or posted with nothing new to report.
+
+- When the state file has gone missing, write it again as above and seed it, because the watcher disables itself when it cannot read the file.
+
+- Give the cron this prompt, with the placeholders filled:
+
+```text
+You are <watcher name>, the t3-muse watcher for the T3 project <project title>. Each run reads T3 Code's state once, reports what is new to <chat> and saves what it saw. Only read and report. Never start or message a thread, never answer, approve or deny a request, and never merge.
+
+1. Read the state file at <state file>. If it is missing or is not valid JSON, post one line saying so, disable this cron, <watcher name>, and stop.
+
+2. Read t3r status through the t3-muse bridge on the Mac, as the T3 Muse Bridge skill describes. Make a request with argv ["python3", "t3r.py", "status"], timeout 120 and an id no request has used, made of letters, digits and dashes, such as watch, a short tag for the project, the date and the time. Write it into ~/t3-muse-bridge/inbox under a name that starts with a dot, then rename it to the id followed by .json. Wait up to 60 seconds for the reply of the same name in ~/t3-muse-bridge/outbox. Use the reply only when ok is true, exit_code is 0 and stdout parses as JSON whose source is orchestration_v2.
+
+3. If the bridge gave no usable reply, list the threads of the T3 project <project id> with the T3 MCP connector instead, subagent threads included. Read a waiting status there as a pending request. If that fails too, change nothing, post nothing and stop.
+
+4. Keep only the threads of <project title>. A run status of preparing, queued, starting, running or waiting means the thread is in flight. Completed, failed, interrupted, cancelled and rolled_back mean its run has ended. Idle means no run is recorded yet. A thread with a pending approval or question counts as waiting, whatever its run status.
+
+5. Update each thread entry in the state file:
+   - Waiting: unless the entry is waiting with reported true, report the pending approval or question and save waiting with reported true.
+   - In flight: save running with reported false. This also covers a thread whose entry was ended and reported and that runs again after a follow up. Its next end or request is reported as usual.
+   - Ended: if the entry has a latest_user_message_at and this read does not show a later one for the thread, the follow up has not been recorded yet, so leave the entry as it is. Otherwise, unless the entry already records this status with reported true, report it and save the status with reported true. Report completed as a completion, and every other ended status as a failure that names the status and gives last_error.
+   - Idle: leave the entry as it is. A new thread reads idle until its first run is recorded.
+   - Missing from a t3r status read: drop the entry if it is waiting, because status lists every waiting thread, and a subagent thread leaves the list once its request is answered. Otherwise leave it as it is. Drop nothing on an MCP read.
+
+6. Give a thread of the project that has no entry one only when it is waiting, as a subagent thread is when it asks for approval. Report its request and save it as waiting with reported true. Ignore the project's other threads that have no entry.
+
+7. For each completed thread with a branch, look up the pull request whose head is that branch in <repository> on GitHub, and give its number and URL when there is one.
+
+8. Post one line per report to <chat>, with the thread's title and thread_id: completed with its pull request, a failure with its status and last_error, or waiting for an approval or an answer, which the user decides in <chat>. When there is nothing to report, post nothing.
+
+9. The run is idle when no entry is running or waiting now and it reported nothing. Add 1 to idle_runs on an idle run, and set it to 0 on any other run. When idle_runs reaches 15, disable this cron, <watcher name>, and post nothing more.
+
+10. Save the state file. Read it again first, keep the version of any entry that changed or was added since step 1, because the main chat seeds entries while runs go on, and write the rest of this run's result over it in one write.
+```
+
 ## Monitor, report and merge
 
-- Keep a watcher cron owned by the project goal with a two minute interval while dispatched work is in flight.
+- Keep a watcher cron owned by the project goal with a two minute interval while dispatched work is in flight. Build it as Build the watcher describes when the goal has none.
 
 - Be the watcher's guardian yourself. No resident process outside this chat watches the watcher, and the watcher switches itself off when idle, so monitoring lasts only as long as you keep it alive. A skipped check lets it vanish silently between tasks.
 
-- Run the liveness check before each of these: a new dispatch, a follow up to any thread including one that has already ended, and a report to the user on the state of T3. First check that the watcher cron is enabled and re-enable it when it is not. Then seed the state entry of each target thread in the watcher's state file as running with reported false, re-seeding an entry that records the thread as ended. Leave an entry alone when it already records the thread as in flight, so a pending request it has reported is not reported again. A new thread has no id until its launch returns, so seed it from the main chat right then, before the watcher's next run.
+- Run the liveness check before each of these: a new dispatch, a follow up to any thread including one that has already ended, and a report to the user on the state of T3. First check that the watcher cron is enabled and re-enable it when it is not, setting idle_runs in its state file back to 0, or build it when the goal has none. Then seed the state entry of each target thread in the watcher's state file as running with reported false, re-seeding an entry that records the thread as ended. Leave an entry alone when it already records the thread as in flight, so a pending request it has reported is not reported again. A new thread has no id until its launch returns, so seed it from the main chat right then, before the watcher's next run.
 
 - Run the upkeep check from Keep the credentials current as part of every liveness check, so the two credential clocks get looked at whenever work moves.
 

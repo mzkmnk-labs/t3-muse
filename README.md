@@ -73,7 +73,8 @@ a watcher cron every two minutes. Each run fetches `t3r status` through the
 bridge, compares it with the watcher's state file, reports only new
 completions, new failures and newly pending approvals and questions, and
 then saves what it saw. The watcher is a plain poll and never holds
-`t3_thread_wait`.
+`t3_thread_wait`. The "Build the watcher" section of the T3 Muse PM skill
+gives the cron's prompt template and the state file's format.
 
 - Muse keeps the watcher alive itself, and no resident guardian runs
   outside the chat. Before a dispatch, a follow-up or a report on the
