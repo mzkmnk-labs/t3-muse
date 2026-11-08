@@ -2,16 +2,6 @@
 
 [English](setup.md) | 日本語
 
-このファイルは Muse が読むためのセットアップ指示書である。t3-muse をセットアップするには、自分の Muse に次の一文を送る:
-
-```text
-https://raw.githubusercontent.com/mzkmnk-labs/t3-muse/main/setup.ja.md を読んで、t3-muse をセットアップして。
-```
-
-あとは Muse がセットアップを進め、人の操作が必要な場面ではチャットで伝える。
-
-ここから先は Muse に向けた指示である。
-
 ## 前提
 
 始める前に、次をユーザーに確認する:
