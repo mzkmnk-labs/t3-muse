@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import skill_audit  # noqa: E402
 
 SCRIPT = Path(__file__).with_name("skill_audit.py")
-SETTINGS = Path(__file__).resolve().parent.parent / ".claude" / "settings.json"
+SETTINGS = Path(__file__).resolve().parent.parent / "settings.json"
 SKILL = skill_audit.SKILL_PATH
 INSTRUCTION = f"同じ変更で {SKILL} を更新すること。本当に影響がない場合はその旨を PR 説明に書くこと"
 
@@ -50,8 +50,8 @@ class SurfaceAreaTests(unittest.TestCase):
             SKILL,
             "skills/t3-muse-starter/skill.yaml",
             ".claude/settings.json",
-            "hooks/skill_audit.py",
-            "hooks/README.md",
+            ".claude/hooks/skill_audit.py",
+            ".claude/hooks/README.md",
             ".github/workflows/ci.yml",
             ".gitignore",
         ):
@@ -101,7 +101,7 @@ class FindDriftTests(unittest.TestCase):
 
     def test_changes_outside_the_surface_are_not_drift(self):
         self.assertEqual(
-            skill_audit.find_drift({"hooks/skill_audit.py", "tools/test_t3w.py", ".gitignore"}),
+            skill_audit.find_drift({".claude/hooks/skill_audit.py", "tools/test_t3w.py", ".gitignore"}),
             [],
         )
 
@@ -117,7 +117,7 @@ class RepoTestCase(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name).resolve()
         self.git("init", "-q", "-b", "main")
-        for path in (SKILL, "tools/t3w.py", "bridge/bridge.py", "README.md", "hooks/keep.txt"):
+        for path in (SKILL, "tools/t3w.py", "bridge/bridge.py", "README.md", ".claude/hooks/keep.txt"):
             self.write(path)
         self.git("add", "-A")
         self.git("commit", "-q", "-m", "base")
@@ -198,14 +198,18 @@ class ChangedPathsTests(RepoTestCase):
 
 
 class CommandLineTests(RepoTestCase):
-    """Runs a copy of the script from inside the repository it audits."""
+    """Runs a copy of the script from inside the repository it audits.
+
+    The copy sits where the real one does, because the script finds the
+    repository root from its own location.
+    """
 
     def setUp(self):
         super().setUp()
-        (self.root / "hooks").mkdir(exist_ok=True)
-        self.script = self.root / "hooks" / "skill_audit.py"
+        self.script = self.root / ".claude" / "hooks" / "skill_audit.py"
+        self.script.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(SCRIPT, self.script)
-        self.git("add", "hooks/skill_audit.py")
+        self.git("add", ".claude/hooks/skill_audit.py")
         self.git("commit", "-q", "-m", "add audit")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
 
@@ -343,15 +347,21 @@ class SettingsTests(unittest.TestCase):
 
     def test_post_tool_is_registered_for_bash(self):
         self.assertEqual(self.hooks["PostToolUse"][0]["matcher"], "Bash")
-        self.assertIn('python3 "$CLAUDE_PROJECT_DIR/hooks/skill_audit.py" --hook post-tool', self.command("PostToolUse"))
+        self.assertIn('python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py" --hook post-tool', self.command("PostToolUse"))
 
     def test_stop_is_registered(self):
-        self.assertIn('python3 "$CLAUDE_PROJECT_DIR/hooks/skill_audit.py" --hook stop', self.command("Stop"))
+        self.assertIn('python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py" --hook stop', self.command("Stop"))
+
+    def test_script_finds_the_root_the_settings_assume(self):
+        # The commands above start from the project root, and the script works
+        # out that same root from where it sits in this checkout.
+        self.assertTrue((skill_audit.REPO_ROOT / SKILL).is_file())
+        self.assertEqual(skill_audit.REPO_ROOT / ".claude" / "hooks" / "skill_audit.py", SCRIPT.resolve())
 
     def test_a_checkout_without_the_script_does_not_block(self):
         # A session keeps its hooks after switching to a branch that has no
-        # hooks/ folder, and python exits 2 for a missing script, which Claude
-        # Code would treat as a Stop that never lets go.
+        # .claude/hooks/skill_audit.py, and python exits 2 for a missing
+        # script, which Claude Code would treat as a Stop that never lets go.
         with tempfile.TemporaryDirectory() as empty:
             env = {**os.environ, "CLAUDE_PROJECT_DIR": empty}
             for event in ("PostToolUse", "Stop"):

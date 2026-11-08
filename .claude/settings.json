@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/hooks/skill_audit.py\" --hook post-tool || true"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook post-tool || true"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/hooks/skill_audit.py\" --hook stop || true"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook stop || true"
           }
         ]
       }

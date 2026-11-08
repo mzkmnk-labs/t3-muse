@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: "24"
       - name: Compile check
-        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py bridge/test_restarter.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py hooks/skill_audit.py hooks/test_skill_audit.py installer/test_t3_muse.py
+        run: python -m py_compile bridge/bridge.py bridge/test_bridge.py bridge/test_restarter.py tools/t3r.py tools/test_t3r.py tools/t3w.py tools/test_t3w.py tools/t3a.py tools/test_t3a.py .claude/hooks/skill_audit.py .claude/hooks/test_skill_audit.py installer/test_t3_muse.py
       - name: Installer syntax check
         run: node --check installer/t3-muse.js
       - name: Plist sanity check
@@ -37,6 +37,6 @@ jobs:
       - name: Answer relay unit tests
         run: python tools/test_t3a.py
       - name: Skill audit unit tests
-        run: python hooks/test_skill_audit.py
+        run: python .claude/hooks/test_skill_audit.py
       - name: Installer dry-run test
         run: python installer/test_t3_muse.py
