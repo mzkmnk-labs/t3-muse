@@ -15,8 +15,11 @@ import skill_audit  # noqa: E402
 
 SCRIPT = Path(__file__).with_name("skill_audit.py")
 SETTINGS = Path(__file__).resolve().parent.parent / "settings.json"
-SKILL = skill_audit.SKILL_PATH
-RULE = f"このリポジトリでは、skill が記述する面を変えたら同じ変更で {SKILL} も更新します。本当に影響がない場合は、その旨を PR 説明に書きます。"
+STARTER_SKILL = "skills/t3-muse-starter/SKILL.md"
+PM_SKILL = "skills/t3-muse-pm/SKILL.md"
+SKILLS = (STARTER_SKILL, PM_SKILL)
+SKILL_METADATA = ("skills/t3-muse-starter/skill.yaml", "skills/t3-muse-pm/skill.yaml")
+RULE = "このリポジトリでは、skill が記述する面を変えたら同じ変更で、その面を記述している skill の SKILL.md も更新します。本当に影響がない場合は、その旨を PR 説明に書きます。"
 HEREDOC_COMMIT = """git commit -m "$(cat <<'EOF'
 Title
 
@@ -55,8 +58,9 @@ class SurfaceAreaTests(unittest.TestCase):
 
     def test_paths_left_out(self):
         for path in (
-            SKILL,
-            "skills/t3-muse-starter/skill.yaml",
+            STARTER_SKILL,
+            PM_SKILL,
+            *SKILL_METADATA,
             ".claude/settings.json",
             ".claude/hooks/skill_audit.py",
             ".claude/hooks/README.md",
@@ -102,16 +106,30 @@ class SurfaceAreaTests(unittest.TestCase):
 
 
 class FindDriftTests(unittest.TestCase):
+    def test_the_audit_guards_both_skills(self):
+        self.assertEqual(skill_audit.SKILL_PATHS, SKILLS)
+
     def test_surface_change_without_skill_is_drift(self):
         drift = skill_audit.find_drift({"tools/t3w.py", "bridge/bridge.py", ".gitignore"})
         self.assertEqual(drift, ["bridge/bridge.py", "tools/t3w.py"])
 
-    def test_skill_in_the_change_clears_drift(self):
-        self.assertEqual(skill_audit.find_drift({"tools/t3w.py", SKILL}), [])
+    def test_either_skill_in_the_change_clears_drift(self):
+        for skill in SKILLS:
+            with self.subTest(skill=skill):
+                self.assertEqual(skill_audit.find_drift({"tools/t3w.py", skill}), [])
 
-    def test_sibling_of_the_skill_does_not_clear_drift(self):
-        drift = skill_audit.find_drift({"tools/t3w.py", "skills/t3-muse-starter/skill.yaml"})
-        self.assertEqual(drift, ["tools/t3w.py"])
+    def test_both_skills_in_the_change_clear_drift(self):
+        self.assertEqual(skill_audit.find_drift({"tools/t3w.py", *SKILLS}), [])
+
+    def test_siblings_of_the_skills_do_not_clear_drift(self):
+        for sibling in (
+            *SKILL_METADATA,
+            "skills/t3-muse-other/SKILL.md",
+            "skills/SKILL.md",
+        ):
+            with self.subTest(sibling=sibling):
+                drift = skill_audit.find_drift({"tools/t3w.py", sibling})
+                self.assertEqual(drift, ["tools/t3w.py"])
 
     def test_changes_outside_the_surface_are_not_drift(self):
         self.assertEqual(
@@ -176,14 +194,21 @@ class AuditedCommandTests(unittest.TestCase):
 
 
 class RepoTestCase(unittest.TestCase):
-    """A repository whose origin/main holds the skill and one file per area."""
+    """A repository whose origin/main holds both skills and one file per area."""
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name).resolve()
         self.git("init", "-q", "-b", "main")
-        for path in (SKILL, "tools/t3w.py", "bridge/bridge.py", "README.md", ".claude/hooks/keep.txt"):
+        for path in (
+            *SKILLS,
+            *SKILL_METADATA,
+            "tools/t3w.py",
+            "bridge/bridge.py",
+            "README.md",
+            ".claude/hooks/keep.txt",
+        ):
             self.write(path)
         self.git("add", "-A")
         self.git("commit", "-q", "-m", "base")
@@ -324,12 +349,33 @@ class CommandLineTests(RepoTestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("tools/t3w.py", result.stdout)
         self.assertIn(RULE, result.stdout)
+        for skill in SKILLS:
+            with self.subTest(skill=skill):
+                self.assertIn(skill, result.stdout)
 
-    def test_check_clean_when_skill_changed_too(self):
+    def check_after_editing(self, *paths):
         self.make_drift()
-        self.write(SKILL, "updated\n")
-        result = self.run_script("--check")
+        for path in paths:
+            self.write(path, "updated\n")
+        return self.run_script("--check")
+
+    def test_check_clean_when_the_starter_skill_changed_too(self):
+        result = self.check_after_editing(STARTER_SKILL)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ドリフトなし", result.stdout)
+
+    def test_check_clean_when_the_pm_skill_changed_too(self):
+        result = self.check_after_editing(PM_SKILL)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ドリフトなし", result.stdout)
+
+    def test_check_drift_when_only_a_skill_yaml_changed(self):
+        # Both skill.yaml files are tracked in the base, so this is a real
+        # change to them, not an untracked file the audit never sees.
+        result = self.check_after_editing(*SKILL_METADATA)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("- tools/t3w.py", result.stdout)
+        self.assertIn("変更パス: 3 件", result.stdout)
 
     def test_check_without_origin_main_is_exit_2(self):
         self.git("update-ref", "-d", "refs/remotes/origin/main")
@@ -530,7 +576,9 @@ class SettingsTests(unittest.TestCase):
     def test_script_finds_the_root_the_settings_assume(self):
         # The commands above start from the project root, and the script works
         # out that same root from where it sits in this checkout.
-        self.assertTrue((skill_audit.REPO_ROOT / SKILL).is_file())
+        for skill in skill_audit.SKILL_PATHS:
+            with self.subTest(skill=skill):
+                self.assertTrue((skill_audit.REPO_ROOT / skill).is_file())
         self.assertEqual(skill_audit.REPO_ROOT / ".claude" / "hooks" / "skill_audit.py", SCRIPT.resolve())
 
     def test_a_checkout_without_the_script_does_not_block(self):

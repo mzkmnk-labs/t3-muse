@@ -1,0 +1,5 @@
+name: "t3-muse-pm"
+title: "T3 Muse PM"
+description: "Run t3-muse day to day: Muse acts as PM for T3 Code through the official MCP connector and the file mailbox bridge, dispatching briefs to threads, relaying the approvals and answers the user decides, watching progress, merging with approval and keeping the setup healthy."
+category: "Work and knowledge"
+include_in_prompt: true

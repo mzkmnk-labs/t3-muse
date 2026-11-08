@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Audit whether skills/t3-muse-starter/SKILL.md kept up with this branch.
+"""Audit whether the two t3-muse skills kept up with this branch.
 
-The skill describes the bridge, the tools, the installer, the docs and the
-setup steps, but nothing forces a change to one of those to touch the skill as
-well, so the skill and what it describes drift apart silently. This compares
-the branch with origin/main and reports drift when a path the skill describes
-has changed and the skill has not.
+skills/t3-muse-starter/SKILL.md (setup) and skills/t3-muse-pm/SKILL.md (day to
+day operation) describe the bridge, the tools, the installer, the docs and the
+setup steps, but nothing forces a change to one of those to touch a skill as
+well, so the skills and what they describe drift apart silently. This compares
+the branch with origin/main and reports drift when a path the skills describe
+has changed and neither SKILL.md has.
 
   --check                    report for people; exit 0 clean, 1 drift, 2 usage or git error
   --hook post-tool [FAMILY]  Claude Code PostToolUse hook for a git commit or gh pr create
@@ -24,7 +25,12 @@ from pathlib import Path
 # This file lives at .claude/hooks/skill_audit.py, three levels below the root.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASE_REF = "origin/main"
-SKILL_PATH = "skills/t3-muse-starter/SKILL.md"
+# A change to either one counts as keeping the skills up to date. The surface
+# below is shared, so the audit does not try to say which skill a path needs.
+SKILL_PATHS = (
+    "skills/t3-muse-starter/SKILL.md",  # setup
+    "skills/t3-muse-pm/SKILL.md",  # day to day operation
+)
 GIT_TIMEOUT_SECONDS = 10
 
 # The commands worth an audit once they succeed, by family. settings.json gives
@@ -37,10 +43,10 @@ AUDITED_COMMANDS = {
     "pr-create": "*gh pr create*",
 }
 
-# The areas the skill describes. An entry ending in "/" covers that directory
+# The areas the skills describe. An entry ending in "/" covers that directory
 # and any other entry is one exact file. A path outside this table never counts
 # as drift, which keeps these out on purpose:
-#   skills/   the skill itself
+#   skills/   the skills themselves
 #   .claude/  this audit and its wiring
 SKILL_SURFACE = (
     "bridge/",  # mailbox daemon, restarter, LaunchAgent plists
@@ -53,8 +59,8 @@ SKILL_SURFACE = (
     "setup.ja.md",  # setup steps, Japanese
 )
 
-# Tests sit beside the code they cover inside the areas above, but the skill
-# does not describe them, so they are checked for and excluded first.
+# Tests sit beside the code they cover inside the areas above, but the skills
+# do not describe them, so they are checked for and excluded first.
 TEST_FILE_GLOBS = ("test_*", "*_test.*")
 TEST_DIRECTORY = "tests"
 
@@ -81,8 +87,8 @@ def surface_area(path: str) -> str | None:
 
 
 def find_drift(paths) -> list[str]:
-    """Return the changed surface paths, or nothing if the skill changed too."""
-    if SKILL_PATH in paths:
+    """Return the changed surface paths, or nothing if a skill changed too."""
+    if any(skill in paths for skill in SKILL_PATHS):
         return []
     return sorted(path for path in paths if surface_area(path))
 
@@ -145,11 +151,12 @@ def drift_message(drift: list[str]) -> str:
     # rather than commands. The file list goes last, so the facts survive if a
     # long list is ever cut short.
     files = "\n".join(f"- {path}" for path in drift)
+    skills = " と ".join(SKILL_PATHS)
     return (
         f"skill audit: {BASE_REF} からの変更に skill の対象領域が含まれていますが、"
-        f"{SKILL_PATH} は変更されていません。\n"
-        "このリポジトリでは、skill が記述する面を変えたら同じ変更で "
-        f"{SKILL_PATH} も更新します。"
+        f"{skills} のどちらも変更されていません。\n"
+        "このリポジトリでは、skill が記述する面を変えたら同じ変更で、"
+        "その面を記述している skill の SKILL.md も更新します。"
         "本当に影響がない場合は、その旨を PR 説明に書きます。\n"
         f"ドリフトしたファイル:\n{files}"
     )
