@@ -58,13 +58,15 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Keep a watcher cron owned by the project goal with a two minute interval while dispatched work is in flight.
 
-- Have each run list the project threads through the MCP helper, compare them with a saved state file, and report only new completions, new failures and newly pending requests, with the pull request number and URL when present.
+- Mark each thread as running in the watcher's state file from the main chat at the moment you dispatch it. Right after a launch, status can still read idle for that thread because no run has been recorded yet, and the mark keeps the next watcher run from taking it for idle. Treat a marked thread as active until status shows its run has ended.
 
-- Have the run hold t3_thread_wait on one running thread with a timeout of about 90000 ms after the comparison, fold a settled result into the same report, and treat a timeout or a relay error as a normal end because the next run re-arms the wait.
+- Have each run fetch t3r status through the bridge, compare it with the saved state file, report only new completions, new failures and newly pending requests, and then save what it saw. The watcher is a plain poll and never holds t3_thread_wait.
 
-- Fall back to the bridge thread list when the MCP read fails, and stay silent when both fail so a transient error never becomes a false report.
+- Find the pull request for a finished thread from the branch field in status. Look up the pull request for that head branch on GitHub, and put its number and URL in the report when one exists.
 
-- Count a run as idle only when nothing is active and nothing was reported, and disable the watcher after two consecutive idle runs. It restarts on the next dispatch.
+- Fall back to the MCP thread list when the bridge read fails, or when status reports the legacy source, and stay silent when both fail so a transient error never becomes a false report.
+
+- Count a run as idle only when nothing is active and nothing was reported, and disable the watcher after three consecutive idle runs. It restarts on the next dispatch.
 
 - Verify the continuous integration check runs for the pull request head commit before proposing a merge. The connector pull request status view can miss Actions check runs, and the check-runs API is the reliable source.
 
