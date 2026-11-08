@@ -53,7 +53,7 @@ Claude Code 2.1.319 で実測した挙動です。
 ## 助言型と fail-open
 
 - どちらのイベントも助言だけです。PostToolUse はツールの実行後に走るので、コミットや PR 作成そのものは止めません。
-- Stop は `decision: "block"` ではなく `hookSpecificOutput.additionalContext` を返します。ドキュメントは、設計どおりに動いて助言を返すフックにこちらを勧めています。ターンを続ける点とループ防止は `block` と同じです。トランスクリプトでは hook error ではなく、Stop hook feedback として残ります。続いたターンが終わるときの Stop には `stop_hook_active: true` が付くので、そこでは黙ります。ターンを続けるのは1ターンにつき1回です。
+- Stop は `decision: "block"` ではなく `hookSpecificOutput.additionalContext` を返します。ドキュメントは、設計どおりに動いて助言を返すフックにこちらを勧めています。ターンを続ける点とループ防止は `block` と同じです。hook error ではなく、hook の追加コンテキストとして Claude に届きます（T3 のセッションでは「Stop hook additional context」と表示され、トランスクリプトの `hookErrors` は空でした）。続いたターンが終わるときの Stop には `stop_hook_active: true` が付くので、そこでは黙ります。ターンを続けるのは1ターンにつき1回です。
 - 想定外のエラーでは何も出さず、exit 0 で抜けます。不正な `--hook` 引数も同じ扱いです。
 - 登録コマンド末尾の `|| true` も同じ目的です。スクリプトの無いブランチへ切り替えると、python は exit 2 を返します。PostToolUse では exit 2 の stderr が Claude に見えてしまいます。Stop でも、現行の Claude Code は stdout が空で stderr がファイル不在を示す exit 2 を止めないエラーとして扱いますが、`|| true` で両方とも exit 0 にそろえています。
 - `|| true` のためにシェル形式（`args` なし）で登録しています。パスは `"$CLAUDE_PROJECT_DIR/..."` と引用符で囲んでいます。ファミリー名を引数にするのは、シェル形式のコマンドに `*` を書くと sh が展開してしまうからです。
