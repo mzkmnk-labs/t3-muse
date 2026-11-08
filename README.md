@@ -12,7 +12,7 @@ set up t3-muse.
 
 ## Architecture
 
-![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads and waits with t3_thread_wait, which Muse holds until the run is done and re-arms after a timeout. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues and renews through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
+![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads, and the watcher falls back to the thread list when the bridge read fails. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do, and the watcher fetches its status through the mailbox every two minutes. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues and renews through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
 
 The user talks to Muse, the product. Muse acts as PM and dispatches tasks
 to T3 Code over two paths.
@@ -21,15 +21,16 @@ to T3 Code over two paths.
 `custom.t3code` → the T3 Connect relay → the environment's official MCP
 server (`/mcp`) → the T3 Code server. The relay uses HTTPS and OAuth
 (authorization code with dynamic registration), with a 30-day session and
-a mode cap. Starting, sending to, reading and listing threads go this way,
-and so does `t3_thread_wait`: to watch for completion, Muse holds the wait
-and re-arms it after a timeout.
+a mode cap. Starting, sending to, reading and listing threads go this way.
+The watcher uses the MCP thread list only as a fallback (see "Watching for
+completion" below).
 
 **Path 2: file mailbox bridge.** Muse → the file mailbox
 `~/t3-muse-bridge`, through the paired device → the bridge daemon (launchd,
 allowlist only), which runs:
 
-- `t3r.py`, which reads `statev2.sqlite` read-only.
+- `t3r.py`, which reads `statev2.sqlite` read-only. The watcher polls its
+  `status`.
 - `t3a.py`, which relays answers to approvals and questions. It relays only
   what the user decided in chat, and approvals need `--user-approved`.
 - `t3w.py`, the fallback when the MCP is unavailable.
@@ -40,6 +41,26 @@ A watchman, `restart-bridge.sh`, restarts the daemon when a file lands in
 **Why two paths.** The official MCP's `t3_pending_request` only answers
 questions and cannot answer permission approvals, so `t3a.py` handles
 approvals. The MCP has no direct database access, so `t3r.py` handles that.
+
+**Watching for completion.** While dispatched work is in flight, Muse runs
+a watcher cron every two minutes. Each run fetches `t3r status` through the
+bridge, compares it with the watcher's state file, reports only new
+completions, new failures and newly pending approvals and questions, and
+then saves what it saw. The watcher is a plain poll and never holds
+`t3_thread_wait`.
+
+- At dispatch, the main chat marks the thread as running in the state
+  file. Right after a launch, status can still read idle because no run
+  has been recorded yet, and the mark keeps the watcher from taking the
+  thread for idle.
+- For a finished thread, the watcher takes the `branch` field from status
+  and looks up the pull request for that branch on GitHub.
+- When the bridge read fails, or status reports the `legacy` source, the
+  watcher falls back to the MCP thread list. When both fail it stays
+  silent, so a transient error never becomes a false report.
+- A run counts as idle when nothing is active and nothing was reported.
+  After three consecutive idle runs the watcher disables itself, and the
+  next dispatch turns it back on.
 
 Key points:
 

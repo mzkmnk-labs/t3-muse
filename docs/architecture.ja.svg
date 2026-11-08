@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1254" width="1240" height="1254" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse 構成図</title>
-  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行い、t3_thread_wait で待機する。Muse は完了までこの待機を保持し、タイムアウトしたら張り直す。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
+  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行う。watcher はブリッジでの読み取りが失敗したとき、このスレッド一覧にフォールバックする。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。watcher は 2 分ごとにメールボックス経由で t3r.py の status を取得する。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -136,8 +136,8 @@
     <path marker-end="url(#arrow-ext)" d="M950 274 V1006"/>
     <text x="962" y="540">スレッドの起動・送信・</text>
     <text x="962" y="559">読み取り・一覧</text>
-    <text x="962" y="660"><tspan class="mono">t3_thread_wait</tspan>: Muse が保持</text>
-    <text x="962" y="679">完了待ち、タイムアウトで張り直す</text>
+    <text x="962" y="660">一覧は watcher のフォールバック</text>
+    <text x="962" y="679">ブリッジの読み取りが失敗したとき</text>
     <text x="962" y="780"><tspan class="mono">t3_pending_request</tspan> は</text>
     <text x="962" y="799">質問への回答のみ、承認は不可</text>
   </g>
@@ -257,6 +257,7 @@
     <text class="t mono c" x="210" y="732">t3r.py</text>
     <text class="s c" x="210" y="768">読み取り専用で参照</text>
     <text class="s c" x="210" y="789">MCP にない DB 参照</text>
+    <text class="p c" x="210" y="822">watcher が 2 分ごとに <tspan class="mono">status</tspan> を取得</text>
     <text class="p mono c" x="210" y="852">~/t3-muse-tools</text>
   </g>
   <g id="node-Answers" class="muse">
