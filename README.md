@@ -49,18 +49,25 @@ completions, new failures and newly pending approvals and questions, and
 then saves what it saw. The watcher is a plain poll and never holds
 `t3_thread_wait`.
 
-- At dispatch, the main chat marks the thread as running in the state
-  file. Right after a launch, status can still read idle because no run
-  has been recorded yet, and the mark keeps the watcher from taking the
-  thread for idle.
+- Muse keeps the watcher alive itself, and no resident guardian runs
+  outside the chat. Before a dispatch, a follow-up or a report on the
+  state of T3, the main chat checks that the watcher is enabled, turns it
+  back on if not, and marks each target thread that has no entry yet, or
+  has ended, as running and not yet reported in the state file. Right after a launch, status can still read
+  idle because no run has been recorded yet, and the mark keeps the
+  watcher from taking the thread for idle.
+- A thread that was reported as ended and runs again, for example after a
+  follow-up, counts as a new incarnation. The watcher clears its reported
+  mark and reports its next completion, failure or pending request as
+  usual.
 - For a finished thread, the watcher takes the `branch` field from status
   and looks up the pull request for that branch on GitHub.
 - When the bridge read fails, or status reports the `legacy` source, the
   watcher falls back to the MCP thread list. When both fail it stays
   silent, so a transient error never becomes a false report.
 - A run counts as idle when nothing is active and nothing was reported.
-  After three consecutive idle runs the watcher disables itself, and the
-  next dispatch turns it back on.
+  After 15 consecutive idle runs, about 30 minutes, the watcher disables
+  itself, and Muse's next check turns it back on.
 
 Key points:
 
