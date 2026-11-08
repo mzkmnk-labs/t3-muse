@@ -132,6 +132,6 @@ jobs:
           python3 .claude/hooks/skill_audit.py --check || status=$?
           case $status in
             0) ;;
-            1) echo "::warning title=Skill audit::A path the skills describe changed, but neither SKILL.md did. See this step's log." ;;
+            1) echo "::warning title=Skill audit::A path the skills describe changed, but none of the SKILL.md files did. See this step's log." ;;
             *) echo "::warning title=Skill audit::The audit could not run (exit $status). See this step's log." ;;
           esac

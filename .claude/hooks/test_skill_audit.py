@@ -17,8 +17,13 @@ SCRIPT = Path(__file__).with_name("skill_audit.py")
 SETTINGS = Path(__file__).resolve().parent.parent / "settings.json"
 STARTER_SKILL = "skills/t3-muse-starter/SKILL.md"
 PM_SKILL = "skills/t3-muse-pm/SKILL.md"
-SKILLS = (STARTER_SKILL, PM_SKILL)
-SKILL_METADATA = ("skills/t3-muse-starter/skill.yaml", "skills/t3-muse-pm/skill.yaml")
+BRIDGE_SKILL = "skills/t3-muse-bridge/SKILL.md"
+SKILLS = (STARTER_SKILL, PM_SKILL, BRIDGE_SKILL)
+SKILL_METADATA = (
+    "skills/t3-muse-starter/skill.yaml",
+    "skills/t3-muse-pm/skill.yaml",
+    "skills/t3-muse-bridge/skill.yaml",
+)
 RULE = "このリポジトリでは、skill が記述する面を変えたら同じ変更で、その面を記述している skill の SKILL.md も更新します。本当に影響がない場合は、その旨を PR 説明に書きます。"
 HEREDOC_COMMIT = """git commit -m "$(cat <<'EOF'
 Title
@@ -58,8 +63,7 @@ class SurfaceAreaTests(unittest.TestCase):
 
     def test_paths_left_out(self):
         for path in (
-            STARTER_SKILL,
-            PM_SKILL,
+            *SKILLS,
             *SKILL_METADATA,
             ".claude/settings.json",
             ".claude/hooks/skill_audit.py",
@@ -106,19 +110,19 @@ class SurfaceAreaTests(unittest.TestCase):
 
 
 class FindDriftTests(unittest.TestCase):
-    def test_the_audit_guards_both_skills(self):
+    def test_the_audit_guards_every_skill(self):
         self.assertEqual(skill_audit.SKILL_PATHS, SKILLS)
 
     def test_surface_change_without_skill_is_drift(self):
         drift = skill_audit.find_drift({"tools/t3w.py", "bridge/bridge.py", ".gitignore"})
         self.assertEqual(drift, ["bridge/bridge.py", "tools/t3w.py"])
 
-    def test_either_skill_in_the_change_clears_drift(self):
+    def test_any_skill_in_the_change_clears_drift(self):
         for skill in SKILLS:
             with self.subTest(skill=skill):
                 self.assertEqual(skill_audit.find_drift({"tools/t3w.py", skill}), [])
 
-    def test_both_skills_in_the_change_clear_drift(self):
+    def test_all_skills_in_the_change_clear_drift(self):
         self.assertEqual(skill_audit.find_drift({"tools/t3w.py", *SKILLS}), [])
 
     def test_siblings_of_the_skills_do_not_clear_drift(self):
@@ -194,7 +198,7 @@ class AuditedCommandTests(unittest.TestCase):
 
 
 class RepoTestCase(unittest.TestCase):
-    """A repository whose origin/main holds both skills and one file per area."""
+    """A repository whose origin/main holds every skill and one file per area."""
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -369,13 +373,18 @@ class CommandLineTests(RepoTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ドリフトなし", result.stdout)
 
+    def test_check_clean_when_the_bridge_skill_changed_too(self):
+        result = self.check_after_editing(BRIDGE_SKILL)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ドリフトなし", result.stdout)
+
     def test_check_drift_when_only_a_skill_yaml_changed(self):
-        # Both skill.yaml files are tracked in the base, so this is a real
+        # Every skill.yaml file is tracked in the base, so this is a real
         # change to them, not an untracked file the audit never sees.
         result = self.check_after_editing(*SKILL_METADATA)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("- tools/t3w.py", result.stdout)
-        self.assertIn("変更パス: 3 件", result.stdout)
+        self.assertIn(f"変更パス: {len(SKILL_METADATA) + 1} 件", result.stdout)
 
     def test_check_without_origin_main_is_exit_2(self):
         self.git("update-ref", "-d", "refs/remotes/origin/main")

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Audit whether the two t3-muse skills kept up with this branch.
+"""Audit whether the three t3-muse skills kept up with this branch.
 
-skills/t3-muse-starter/SKILL.md (setup) and skills/t3-muse-pm/SKILL.md (day to
-day operation) describe the bridge, the tools, the installer, the docs and the
-setup steps, but nothing forces a change to one of those to touch a skill as
-well, so the skills and what they describe drift apart silently. This compares
-the branch with origin/main and reports drift when a path the skills describe
-has changed and neither SKILL.md has.
+skills/t3-muse-starter/SKILL.md (setup), skills/t3-muse-pm/SKILL.md (day to day
+operation) and skills/t3-muse-bridge/SKILL.md (using the bridge) describe the
+bridge, the tools, the installer, the docs and the setup steps, but nothing
+forces a change to one of those to touch a skill as well, so the skills and what
+they describe drift apart silently. This compares the branch with origin/main
+and reports drift when a path the skills describe has changed and none of the
+SKILL.md files has.
 
   --check                    report for people; exit 0 clean, 1 drift, 2 usage or git error
   --hook post-tool [FAMILY]  Claude Code PostToolUse hook for a git commit or gh pr create
@@ -25,11 +26,12 @@ from pathlib import Path
 # This file lives at .claude/hooks/skill_audit.py, three levels below the root.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASE_REF = "origin/main"
-# A change to either one counts as keeping the skills up to date. The surface
+# A change to any one counts as keeping the skills up to date. The surface
 # below is shared, so the audit does not try to say which skill a path needs.
 SKILL_PATHS = (
     "skills/t3-muse-starter/SKILL.md",  # setup
     "skills/t3-muse-pm/SKILL.md",  # day to day operation
+    "skills/t3-muse-bridge/SKILL.md",  # using the bridge
 )
 GIT_TIMEOUT_SECONDS = 10
 
@@ -151,10 +153,10 @@ def drift_message(drift: list[str]) -> str:
     # rather than commands. The file list goes last, so the facts survive if a
     # long list is ever cut short.
     files = "\n".join(f"- {path}" for path in drift)
-    skills = " と ".join(SKILL_PATHS)
+    skills = "、".join(SKILL_PATHS)
     return (
         f"skill audit: {BASE_REF} からの変更に skill の対象領域が含まれていますが、"
-        f"{skills} のどちらも変更されていません。\n"
+        f"{skills} のいずれも変更されていません。\n"
         "このリポジトリでは、skill が記述する面を変えたら同じ変更で、"
         "その面を記述している skill の SKILL.md も更新します。"
         "本当に影響がない場合は、その旨を PR 説明に書きます。\n"

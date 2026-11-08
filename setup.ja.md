@@ -47,6 +47,7 @@ https://raw.githubusercontent.com/mzkmnk-labs/t3-muse/main/setup.ja.md を読ん
 - `t3r health` が成功する
 - `t3a pending` が空の一覧を返す
 - MCP 経由の読み取り (プロジェクト一覧など) が成功する
+- T3 Muse PM と T3 Muse Bridge の 2 つの skill が、ユーザーのカスタムスキル置き場の `~/workspace/custom-skills/t3-muse-pm/` と `~/workspace/custom-skills/t3-muse-bridge/` にある
 
 結果をユーザーに報告する。
 

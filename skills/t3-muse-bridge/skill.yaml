@@ -1,0 +1,5 @@
+name: "t3-muse-bridge"
+title: "T3 Muse Bridge"
+description: "Use the t3-muse file mailbox bridge on the user's Mac: write request JSON into the inbox through the paired device channel, read the reply from the outbox, call the allowlisted bridge-ping, t3r, t3w and t3a commands with the arguments the bridge accepts, and restart or stop the daemon."
+category: "Work and knowledge"
+include_in_prompt: true

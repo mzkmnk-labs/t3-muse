@@ -4,9 +4,10 @@ Rules for agents working in this repo.
 
 t3-muse is a companion that lets Muse drive T3 Code: Muse acts as PM and
 T3 Code does the implementation. For how it is set up, see
-`skills/t3-muse-starter/`, and for how it is run day to day, see
-`skills/t3-muse-pm/`. For the architecture, see `README.md`. For the bridge's
-design and security notes, see `bridge/README.md`.
+`skills/t3-muse-starter/`. For how it is run day to day, see
+`skills/t3-muse-pm/`, and for how Muse uses the bridge, see
+`skills/t3-muse-bridge/`. For the architecture, see `README.md`. For the
+bridge's design and security notes, see `bridge/README.md`.
 
 ## Code
 
@@ -32,7 +33,9 @@ design and security notes, see `bridge/README.md`.
 - When you change anything the skills describe (`bridge/`, `tools/`,
   `installer/`, `docs/`, the READMEs, the setup guides), update the skill that
   describes it in the same PR: `skills/t3-muse-starter/SKILL.md` for setup,
-  `skills/t3-muse-pm/SKILL.md` for day-to-day operation, or both.
+  `skills/t3-muse-pm/SKILL.md` for day-to-day operation,
+  `skills/t3-muse-bridge/SKILL.md` for how the bridge and its tools are used,
+  or whichever of them apply.
 - Write docs in English by default. When a doc also has a Japanese version,
   name it `<name>.ja.md` beside the English `<name>.md`, as with `README.md`
   and `README.ja.md` or `setup.md` and `setup.ja.md`, and keep the content of

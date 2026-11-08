@@ -1,5 +1,5 @@
 name: "t3-muse-starter"
 title: "T3 Muse Starter"
-description: "Set up t3-muse from scratch on the user's Mac, entered from setup.md: install the file mailbox bridge, connect the official T3 MCP connector, verify the whole path and place the T3 Muse PM skill for day-to-day work."
+description: "Set up t3-muse from scratch on the user's Mac, entered from setup.md: install the file mailbox bridge, connect the official T3 MCP connector, verify the whole path and place the T3 Muse PM and T3 Muse Bridge skills for day-to-day work."
 category: "Work and knowledge"
 include_in_prompt: false
