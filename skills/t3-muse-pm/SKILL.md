@@ -40,7 +40,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Register a repository as a T3 project first when it is missing, using t3w add-project through the bridge or an MCP read to confirm the project id.
 
-- Re-enable the watcher cron on every dispatch so completions are reported without the user asking.
+- Run the watcher liveness check in Monitor, report and merge before every dispatch and every follow up, so completions are reported without the user asking.
 
 ## Relay approvals and questions
 
@@ -58,15 +58,25 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Keep a watcher cron owned by the project goal with a two minute interval while dispatched work is in flight.
 
-- Mark each thread as running in the watcher's state file from the main chat at the moment you dispatch it. Right after a launch, status can still read idle for that thread because no run has been recorded yet, and the mark keeps the next watcher run from taking it for idle. Treat a marked thread as active until status shows its run has ended.
+- Be the watcher's guardian yourself. No resident process outside this chat watches the watcher, and the watcher switches itself off when idle, so monitoring lasts only as long as you keep it alive. A skipped check lets it vanish silently between tasks.
+
+- Run the liveness check before each of these: a new dispatch, a follow up to any thread including one that has already ended, and a report to the user on the state of T3. First check that the watcher cron is enabled and re-enable it when it is not. Then seed the state entry of each target thread in the watcher's state file as running with reported false, re-seeding an entry that already exists. A new thread has no id until its launch returns, so seed it from the main chat right then, before the watcher's next run.
+
+- Take as the targets of a status report the threads the report shows as still in flight, so a thread that has already ended is not seeded and reported a second time.
+
+- Expect status to read idle for a thread right after its launch, because no run has been recorded yet. The seed keeps the next watcher run from taking it for idle. Treat a seeded thread as active until status shows its run has ended.
+
+- When the entry you re-seed had already ended, also record in it the thread's latest_user_message_at from the last status read. Right after a follow up, status can still show the earlier run as ended because the new message is not recorded yet. Have the watcher treat that entry as still active until latest_user_message_at in status moves past the recorded value, and only then read an ended status as the new run's. Put the entry back as it was if the follow up fails to send.
 
 - Have each run fetch t3r status through the bridge, compare it with the saved state file, report only new completions, new failures and newly pending requests, and then save what it saw. The watcher is a plain poll and never holds t3_thread_wait.
+
+- Treat a thread as a new incarnation when its entry records it as ended and reported and status shows it running again, as happens after a follow up. Reset reported to false, save it as running, and report its next completion, failure or pending request as usual. A run that starts and ends between two polls never reads running, so this rule is the watcher's safety net and your re-seed before a follow up is the main guard.
 
 - Find the pull request for a finished thread from the branch field in status. Look up the pull request for that head branch on GitHub, and put its number and URL in the report when one exists.
 
 - Fall back to the MCP thread list when the bridge read fails, or when status reports the legacy source, and stay silent when both fail so a transient error never becomes a false report.
 
-- Count a run as idle only when nothing is active and nothing was reported, and disable the watcher after three consecutive idle runs. It restarts on the next dispatch.
+- Count a run as idle only when nothing is active and nothing was reported, and disable the watcher after fifteen consecutive idle runs, about thirty minutes at the two minute interval, so the gap between tasks does not switch it off. Nothing turns it back on except your next liveness check.
 
 - Verify the continuous integration check runs for the pull request head commit before proposing a merge. The connector pull request status view can miss Actions check runs, and the check-runs API is the reliable source.
 
