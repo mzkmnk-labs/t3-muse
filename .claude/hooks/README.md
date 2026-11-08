@@ -2,16 +2,16 @@
 
 English | [日本語](README.ja.md)
 
-An internal tool that keeps `skills/t3-muse-starter/SKILL.md` and the docs and code it describes from drifting apart silently. The skill describes how the bridge, the tools, the installer, the diagrams, the READMEs and the setup steps behave. Changing one of those doesn't force anyone to fix the skill too. A surface that has changed while the skill hasn't is called drift, and this hook tells Claude about it at commit time, at PR creation, and at the end of a turn.
+An internal tool that keeps the two Muse skills, `skills/t3-muse-starter/SKILL.md` (setup) and `skills/t3-muse-pm/SKILL.md` (day-to-day operation), and the docs and code they describe from drifting apart silently. The skills describe how the bridge, the tools, the installer, the diagrams, the READMEs and the setup steps behave. Changing one of those doesn't force anyone to fix a skill too. A surface that has changed while neither skill has is called drift, and this hook tells Claude about it at commit time, at PR creation, and at the end of a turn.
 
 ## What it does
 
-It computes the change set since the merge base of the current branch and `origin/main`. The set covers tracked changes that are committed, staged or unstaged. When a surface area has changed and `SKILL.md` is not in the set, it reports drift.
+It computes the change set since the merge base of the current branch and `origin/main`. The set covers tracked changes that are committed, staged or unstaged. When a surface area has changed and neither `SKILL.md` is in the set, it reports drift. A change to at least one of the two counts as updating the skills. The surface is shared, so the audit doesn't decide which skill a path belongs to; that is left to whoever makes the change.
 
 - Surface: `bridge/`, `tools/`, `installer/`, `docs/`, `README.md`, `README.ja.md`, `setup.md`, `setup.ja.md`
 - Left out: `skills/`, `.claude/` (this audit and its wiring), and tests (`test_*`, `*_test.*`, anything under `tests/`)
 
-The surface table lives in one place, `SKILL_SURFACE` in `skill_audit.py`.
+The surface table lives in one place, `SKILL_SURFACE` in `skill_audit.py`, and the two guarded files are `SKILL_PATHS` beside it. A `skill.yaml` change alone doesn't count.
 
 ## When it fires
 
@@ -80,4 +80,4 @@ Exit 0 means no drift, and exit 1 means drift. Exit 2 means a usage error, or th
 
 - It doesn't run `git fetch`. It uses the local `origin/main` as the base, so when that is stale it can count changes that already landed on main as changes on the branch.
 - It audits the checkout the script sits in, which is the project the session started in. If the session enters a worktree partway through, `$CLAUDE_PROJECT_DIR` still points at the original place, so the audit doesn't follow. T3 starts its sessions inside the worktree, so this gap doesn't arise there.
-- A change that really doesn't affect the skill still counts as drift on its branch until `SKILL.md` changes, and Stop keeps one turn going each time. In that case, say in the PR description that the skill isn't affected, and finish as usual.
+- A change that really doesn't affect either skill still counts as drift on its branch until one of the two `SKILL.md` files changes, and Stop keeps one turn going each time. In that case, say in the PR description that the skills aren't affected, and finish as usual.
