@@ -15,7 +15,7 @@ Confirm these with the user before you start:
 
 - T3 Code is running on the user's Mac.
 - The user has a Muse account.
-- Node.js 18 or later is installed on the Mac.
+- Node.js 24 or later is installed on the Mac.
 
 ## Steps
 
