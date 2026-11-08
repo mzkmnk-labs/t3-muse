@@ -264,3 +264,7 @@ session issued last, because it belongs to the new token.
 - Then open the minimal read-only path
 - Write skills one at a time, as they become necessary, matched to
   how the system actually behaves
+
+## License
+
+t3-muse is released under the MIT License. See [LICENSE](LICENSE).

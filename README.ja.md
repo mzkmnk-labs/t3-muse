@@ -147,3 +147,7 @@ python3 t3a.py issue-token                        # 再発行するときだけ
 - まずブリッジを Mac Studio で動かし、疎通 (bridge-ping) を確認する
 - 次に読み取り専用の最小経路を通す
 - スキルは必要になったものから、実動作に合わせて1つずつ書く
+
+## ライセンス
+
+t3-muse は MIT ライセンスで公開している。詳細は [LICENSE](LICENSE) を参照。
