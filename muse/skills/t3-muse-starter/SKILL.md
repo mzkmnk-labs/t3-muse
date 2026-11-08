@@ -28,7 +28,11 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Prefer the npx installer to the manual route. When you reach this step, ask the user in chat to run npx @mzkmnk-labs/t3-muse install in a terminal on the Mac. It places the bridge and its tools, loads both LaunchAgents and checks bridge-ping, t3r health and t3a pending through the mailbox.
 
-- Expect the token prompt on a machine with no token file. The installer asks No t3a token found. Issue one now? [y/N], and the answer is the user's to give. Only y issues the token. If they decline, or the installer runs without a terminal, it stops at t3a pending with NO_TOKEN until t3a issue-token has run and install is run again.
+- Expect the token prompt on a machine with no token file. The installer asks No t3a token found. Issue one now? [y/N] in the user's terminal. This prompt is the normal way the token is issued, and the answer is the user's to give. Only y issues the token. You cannot see the terminal, so ask the user whether the prompt appeared and what they answered.
+
+- Treat any answer but y as a no. The install then stops at t3a pending with NO_TOKEN. Do not issue the token yourself at that point. If the setup needs it, explain again what the token is for and ask once more.
+
+- Expect no prompt when the installer runs without a terminal, or when a token file is there but unusable. The install then stops at t3a pending with NO_TOKEN as well.
 
 - A TOKEN_REJECTED is never asked about, so replace that token with t3a renew.
 
@@ -48,7 +52,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Restart the bridge later by placing any file into restart-trigger. The restarter job kickstarts the daemon and appends the result to restart.log, so the user never needs a terminal for restarts.
 
-- Stop everything at any time by unloading the bridge plist or deleting the bridge folder. Treat that as the kill switch and mention it to the user during setup.
+- Stop the bridge by unloading both LaunchAgent plists, and keep it stopped across logins with npx @mzkmnk-labs/t3-muse uninstall. Deleting the bridge folder alone does not stop a running daemon, so unload first and delete the folder after, if at all. This is the kill switch for the bridge only. The MCP connector is stopped in T3 Code, as Stop the bridge in the T3 Muse Bridge skill describes. Mention both to the user during setup.
 
 ## Connect the official MCP
 
@@ -70,7 +74,9 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Run t3r health and t3w list for a known project through the bridge and check that both succeed. Pass a project id or path to t3w list, because a bare list fails from the tools folder when no project matches the current directory.
 
-- Issue the approval token with t3a issue-token when the installer prompt has not already done so. The tool writes the bundled T3 CLI output straight into a token file with 0600 permissions, and the token value is never printed, logged or sent to Muse.
+- Issue the approval token through the bridge with t3a issue-token only when the setup stopped without a token, because the prompt never appeared or the user said no to it, and only after the user agrees explicitly in chat. After a no at the prompt, that means asking again as described above, never issuing on the spot. The user can instead run python3 ~/t3-muse-tools/t3a.py issue-token in the terminal and then install again.
+
+- Expect issue-token to write the bundled T3 CLI output straight into a token file with 0600 permissions, so the token value is never printed, logged or sent to Muse. It refuses with TOKEN_EXISTS when a token file is there but unusable, so the user deletes the file on the Mac first.
 
 - Run t3a pending and accept an empty list as proof that the local WebSocket round trip works.
 
