@@ -2,9 +2,7 @@
 
 English | [日本語](README.ja.md)
 
-A companion for working with T3 Code from Meta Muse. Built
-incrementally and from scratch: each piece is added only when it is
-actually needed.
+A companion for working with T3 Code from Meta Muse.
 
 ## Architecture
 
@@ -50,8 +48,6 @@ Key points:
   actually asked Muse to make. Permission approvals go only through
   `t3a.py`. Answers to T3's pending approvals and questions are relayed
   only when the user decided them.
-- The existing Grok-side t3-tots setup (`~/t3-tots`) runs on the same
-  Mac but is out of scope for this project.
 - The bridge cannot restart itself, so a separate launchd job does it:
   a file dropped into `~/t3-muse-bridge/restart-trigger` runs
   `restart-bridge.sh`, which restarts only the bridge job. The bridge
