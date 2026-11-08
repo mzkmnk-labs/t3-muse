@@ -50,9 +50,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Check the current tool description before relying on what the MCP pending request respond action can answer. In the build this skill was written against it covers user questions only and cannot approve a permission request, so approvals go through t3a.
 
-- Update the approval token by running t3a renew through the bridge with a 300 second timeout. This is the normal route, and it also works once the token has expired. The token lifetime is 90 days. It issues a new token into a 0600 temp file, proves it with a pending list, swaps it in with an atomic rename and only then revokes the old session. A failure before the swap leaves the token file untouched. Report the facts it prints to the user, which are expires_at, old_session and, when one older session was found, previous_expires_at.
-
-- Treat the manual steps as the fallback. When old_session comes back left_active nothing was revoked, because renew revokes only what the session lists prove is the old session. Follow the note it prints: on the Mac, use the bundled T3 CLI session list and revoke commands and keep the t3-muse session issued last, because it belongs to the new token. When renew cannot run or the token is no longer wanted, revoke the session with those commands and delete the token file, then run issue-token again only to reissue.
+- When t3a pending or answer returns TOKEN_REJECTED, the approval token has expired or been revoked. Renew it as Keep the credentials current describes, then relay the user's answer again.
 
 ## Monitor, report and merge
 
@@ -61,6 +59,8 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 - Be the watcher's guardian yourself. No resident process outside this chat watches the watcher, and the watcher switches itself off when idle, so monitoring lasts only as long as you keep it alive. A skipped check lets it vanish silently between tasks.
 
 - Run the liveness check before each of these: a new dispatch, a follow up to any thread including one that has already ended, and a report to the user on the state of T3. First check that the watcher cron is enabled and re-enable it when it is not. Then seed the state entry of each target thread in the watcher's state file as running with reported false, re-seeding an entry that records the thread as ended. Leave an entry alone when it already records the thread as in flight, so a pending request it has reported is not reported again. A new thread has no id until its launch returns, so seed it from the main chat right then, before the watcher's next run.
+
+- Run the upkeep check from Keep the credentials current as part of every liveness check, so the two credential clocks get looked at whenever work moves.
 
 - Take as the targets of a status report the threads the report shows as still in flight, so a thread that has already ended is not seeded and reported a second time.
 
@@ -82,13 +82,43 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Merge only with the user's approval and use a squash merge. The repository rejects direct pushes to main.
 
+## Keep the credentials current
+
+- Keep track of two clocks. The two credentials run out on their own schedules, and they renew in different ways.
+
+- The MCP connector grant lasts about 30 days from the day the user approved the sign-in in the T3 app. Renewing it needs the user's consent every time, because only they can approve a sign-in. No tool prints when the grant ends, so the approval day is the anchor you count from.
+
+- The t3a approval token lasts 90 days. You renew it yourself with t3a renew through the bridge, and the user only hears the result. Its expiry is the expires_at that issue-token and renew print. When the installer issued the token, that result stays in the mailbox outbox, and the installer also prints the expiry in the user's terminal.
+
+- Write both clocks into the record this environment keeps across chats, such as your memory. Write it at setup and again after every renew and every re-approval: the day the grant was approved, the day about 30 days later when it comes due, the token's expires_at, and the last day an MCP read passed.
+
+- Never leave a clock unknown. The expires_at that issue-token prints is counted on the Mac from the moment it issued the 90 day session, so record it as it is. The one renew prints comes from the T3 session list and is null when the lists do not single out the new session. Then record the day of the renew plus 90 days and mark it as estimated. When the grant's approval day is missing, ask the user when they approved it, and if nobody knows, offer to run the sign-in again so the clock starts from a known day.
+
+- Start the upkeep check by comparing today with the recorded dates. It costs only a read of the record and tells you which of the steps below are due.
+
+- Test the grant with one cheap MCP read, such as the project list, at the first liveness check of each day you work, and record the day it passed. An authentication error sends you to the grant recovery below.
+
+- Renew the token once 14 days or fewer remain before the recorded expires_at, rather than waiting for t3a to answer TOKEN_REJECTED. Run t3a renew through the bridge with a 300 second timeout while T3 Code is running. This is the normal route, and it also works once the token has expired. It issues a new token into a 0600 temp file, proves it with a pending list, swaps it in with an atomic rename and only then revokes the old session. A failure before the swap leaves the token file untouched. Report the facts it prints to the user, which are expires_at, old_session and, when one older session was found, previous_expires_at, and write the new expires_at into the record.
+
+- Treat the manual steps as the fallback. When old_session comes back left_active nothing was revoked, because renew revokes only what the session lists prove is the old session. Follow the note it prints: on the Mac, use the bundled T3 CLI session list and revoke commands and keep the t3-muse session issued last, because it belongs to the new token. When renew cannot run or the token is no longer wanted, revoke the session with those commands and delete the token file, then run issue-token again only to reissue.
+
+- Tell the user once the grant is about five days from its due day, and offer to run the sign-in again at a time that suits them, so it does not lapse in the middle of a task. Start it only when they agree, and record the new approval day.
+
+- When an MCP call through the connector fails with an authentication error, such as a 401, a token reported invalid or expired, or a prompt to sign in again, suspect the grant first, above all when the record shows it near or past its due day. A 403 with a Cloudflare 1010 body is the relay refusing the client, not the grant.
+
+- Restore the grant on the connector registration you made at setup. Keep its MCP URL, OAuth settings and scopes, and do not register a second connector. Start the sign-in again on that connector the way setup did, and ask the user for one thing only: to approve it in the T3 app, picking the same access mode as before.
+
+- Once they approve, run the cheap MCP read again, and report the grant as restored only after it passes. Then record the new approval day and due day, and retry the call that failed.
+
+- Keep working through the bridge while the grant is down. The t3r status read keeps the watcher going, and t3w is the fallback for dispatch.
+
+- Go back to Connect the official MCP in the T3 Muse Starter skill when the new sign-in fails or the environment's MCP URL has changed, because then the registration itself needs redoing.
+
 ## Maintain and troubleshoot
 
 - Replace bridge or tool files through the device file channel, verify them by reading back, and restart the daemon through the restart trigger instead of asking the user to run launchctl.
 
-- Re-approve the MCP connector grant when it expires at about 30 days and renew the approval token with t3a renew before its 90 days run out.
-
-- Check the quarantine attribute first when a LaunchAgent load fails with error 5, check for a Cloudflare 1010 body when the relay returns 403, and check that the credential was attached when it returns 401.
+- Check the quarantine attribute first when a LaunchAgent load fails with error 5, and check for a Cloudflare 1010 body when the relay returns 403. When a request returns 401, check that a hand written client attached the credential, and for a call through the connector, follow the grant recovery in Keep the credentials current.
 
 - Pass a project id or path to t3w list. A bare list fails from the tools folder because no project matches the current directory.
 
