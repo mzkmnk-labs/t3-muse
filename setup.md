@@ -8,6 +8,15 @@ Confirm these with the user before you start:
 
 - T3 Code is running on the user's Mac.
 - The user has a Muse account.
+- The Mac is paired with Muse as a device. The bridge path depends on
+  it, because you place every request file in the bridge's mailbox and
+  read every reply through that pairing. Without it you cannot reach the
+  mailbox, so neither the bridge checks under Done when nor day-to-day
+  use of the bridge can work. The MCP path does not need it. If the Mac
+  is not paired, ask the user to open the Muse app on that Mac and pair
+  it, and confirm you can reach it as a device before you go on. The
+  installer's own checks run locally on the Mac and pass without a
+  pairing, so a passing install does not prove the Mac is paired.
 - Node.js 24 or later is installed on the Mac.
 
 ## Steps
