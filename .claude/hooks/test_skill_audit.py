@@ -60,7 +60,9 @@ class SurfaceAreaTests(unittest.TestCase):
             ".claude/settings.json",
             ".claude/hooks/skill_audit.py",
             ".claude/hooks/README.md",
+            ".claude/hooks/README.ja.md",
             ".github/workflows/ci.yml",
+            "CLAUDE.md",
             ".gitignore",
         ):
             with self.subTest(path=path):

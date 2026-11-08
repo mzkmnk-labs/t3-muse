@@ -1,81 +1,83 @@
-# Skill 監査フック
+# Skill audit hook
 
-`skills/t3-muse-starter/SKILL.md` と、skill が記述するドキュメントや実装が、静かに食い違っていくのを防ぐための repo 内部の道具です。skill は bridge やツール、インストーラ、図、README、セットアップ手順の挙動を記述しています。しかし、そちらを変えても skill まで直されるとは限りません。対象の面が変わったのに skill が直っていない状態をドリフトと呼び、コミットと PR 作成の時点と、ターンの終わりに Claude へ知らせます。
+English | [日本語](README.ja.md)
 
-## 何をするか
+An internal tool that keeps `skills/t3-muse-starter/SKILL.md` and the docs and code it describes from drifting apart silently. The skill describes how the bridge, the tools, the installer, the diagrams, the READMEs and the setup steps behave. Changing one of those doesn't force anyone to fix the skill too. A surface that has changed while the skill hasn't is called drift, and this hook tells Claude about it at commit time, at PR creation, and at the end of a turn.
 
-現在のブランチと `origin/main` の merge-base からの変更集合を計算します。コミット済み、ステージ済み、未ステージの、追跡対象の変更が含まれます。対象領域が変更されているのに `SKILL.md` が変更集合に含まれない状態を、ドリフトとして報告します。
+## What it does
 
-- 対象領域：`bridge/`、`tools/`、`installer/`、`docs/`、`README.md`、`README.ja.md`、`setup.md`、`setup.ja.md`
-- 対象外：`skills/`、`.claude/`（この監査自体と登録設定）、テスト（`test_*`、`*_test.*`、`tests/` 以下）
+It computes the change set since the merge base of the current branch and `origin/main`. The set covers tracked changes that are committed, staged or unstaged. When a surface area has changed and `SKILL.md` is not in the set, it reports drift.
 
-領域テーブルは `skill_audit.py` の `SKILL_SURFACE` の1か所にあります。`setup.md` と `setup.ja.md` は、リポジトリにまだ無い間も対象です。存在しないファイルは変更集合に現れないので何も起きず、追加された時点で変更として数えます。
+- Surface: `bridge/`, `tools/`, `installer/`, `docs/`, `README.md`, `README.ja.md`, `setup.md`, `setup.ja.md`
+- Left out: `skills/`, `.claude/` (this audit and its wiring), and tests (`test_*`, `*_test.*`, anything under `tests/`)
 
-## いつ発火するか
+The surface table lives in one place, `SKILL_SURFACE` in `skill_audit.py`.
 
-Claude Code の規約どおり、スクリプトは `.claude/hooks/` に置き、`.claude/settings.json` から `$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py` として登録しています。セッション中に設定ファイルを編集すると、Claude Code のファイル監視が拾ってそのまま反映します。反映されない場合はセッションを開き直してください。
+## When it fires
 
-| イベント | 絞り込み | 動き |
+Following Claude Code's conventions, the script sits in `.claude/hooks/`, and `.claude/settings.json` registers it as `$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py`. When you edit the settings file during a session, Claude Code's file watcher picks up the change and applies it. If it doesn't, restart the session.
+
+| Event | Narrowed by | What happens |
 | --- | --- | --- |
-| PostToolUse（Bash） | `if: "Bash(*git *commit*)"`、`--hook post-tool commit` | ドリフトがあれば、ファイル一覧とリポジトリの決まりを Claude の文脈に追加する |
-| PostToolUse（Bash） | `if: "Bash(*gh pr create*)"`、`--hook post-tool pr-create` | 同上 |
-| Stop | なし | `stop_hook_active` が false でドリフトがあれば、同じ内容を渡してターンを1回だけ続けさせる |
+| PostToolUse (Bash) | `if: "Bash(*git *commit*)"`, `--hook post-tool commit` | On drift, adds the file list and the repo rule to Claude's context |
+| PostToolUse (Bash) | `if: "Bash(*gh pr create*)"`, `--hook post-tool pr-create` | Same as above |
+| Stop | Nothing | When `stop_hook_active` is false and there is drift, hands over the same text and keeps the turn going once |
 
-### コマンドの絞り込み
+### Narrowing the commands
 
-以前は全 Bash 呼び出しで python を起動し、スクリプトの中でコマンド文字列の部分一致を見ていました。いまは handler の `if` で、Claude Code が python を起動する前に絞り込みます。`if` には1つの handler に1つのルールしか書けないので、コミット用と PR 作成用に handler を2つ置いています。
+The previous version started python on every Bash call and matched substrings of the command inside the script. Now each handler's `if` narrows the call before Claude Code starts python. An `if` holds one rule per handler, so there are two handlers, one for commits and one for PR creation.
 
-- パターンの先頭の `*` は、前に付くラッパーのためです。実測では、`Bash(gh pr create *)` は `wrapper gh pr create` のようにラッパーを前に付けた形に一致しませんでした。`Bash(git commit *)` も `timeout 30 git commit` や `nohup git commit` に一致しませんでした。ドキュメントにある permission rule のラッパー除去は、`if` では効きません。
-- `*git *commit*` は、旧実装の部分一致が取りこぼしていた `git -C <dir> commit`、`git -c k=v commit`、`git --no-pager commit` も拾います。`/usr/bin/git commit`、`sh -c 'git commit ...'`、`nohup git commit` も一致します。どれも 2.1.319 で実測しました。
-- スクリプトも、同じパターンでコマンド全文を確かめます。ドキュメントのとおり `if` は best-effort で、`$()` やバッククォートを含むコマンドでは、プログラム名より多くを指定したパターンの handler がすべて起動します。`$PWD` のような変数を含むコマンドでも起動することがあります。Claude の標準的なコミット `git commit -m "$(cat <<'EOF' ... )"` もこれに当たります。各 handler は自分のファミリー名を渡し、スクリプトはそのファミリーのパターンだけを見ます。そのため、1回のコミットで出る監査は1回です。
-- パターン表はスクリプトの `AUDITED_COMMANDS` にあります。`settings.json` の `if` と一致していることはテストで確かめています。ファミリー名を省いた `--hook post-tool` は、全ファミリーを見ます。
+- The leading `*` in each pattern is for wrappers in front of the command. Measured: `Bash(gh pr create *)` did not match a wrapped form such as `wrapper gh pr create`, and `Bash(git commit *)` did not match `timeout 30 git commit` or `nohup git commit`. The wrapper stripping that the docs describe for permission rules doesn't apply to `if`.
+- `*git *commit*` also catches `git -C <dir> commit`, `git -c k=v commit` and `git --no-pager commit`, which the old substring match missed. `/usr/bin/git commit`, `sh -c 'git commit ...'` and `nohup git commit` match too. All of these were measured on 2.1.319.
+- The script checks the whole command against the same pattern. As the docs say, `if` is best effort: on a command holding `$()` or backticks, every handler whose pattern names more than a program starts. A command holding a variable such as `$PWD` can start them too. Claude's usual commit, `git commit -m "$(cat <<'EOF' ... )"`, is one of these. Each handler passes its family name, and the script looks only at that family's pattern, so one commit gets one audit.
+- The pattern table is `AUDITED_COMMANDS` in the script. A test checks that it matches the `if` in `settings.json`. `--hook post-tool` without a family name checks every family.
 
-Claude Code 2.1.319 で実測した挙動です。
+Behavior measured on Claude Code 2.1.319:
 
-| コマンド | 起動した handler | 出力 |
+| Command | Handlers started | Output |
 | --- | --- | --- |
-| `git add -A && git commit -m "$(cat <<'MSG' ... )"` | commit | 監査1回 |
-| `git -C "$PWD" commit ...` | commit、pr-create | commit 側だけが監査を出す |
-| `gh pr create --fill`、`wrapper gh pr create --fill` | pr-create | 監査1回 |
-| `echo $(date)` | commit、pr-create | どちらも無言 |
-| `echo "$HOME"`、`git status`、`ls` | なし | なし |
-| `git status; echo commit` | なし（サブコマンド単位で判定される） | なし |
+| `git add -A && git commit -m "$(cat <<'MSG' ... )"` | commit | One audit |
+| `git -C "$PWD" commit ...` | commit, pr-create | Only commit reports |
+| `gh pr create --fill`, `wrapper gh pr create --fill` | pr-create | One audit |
+| `echo $(date)` | commit, pr-create | Both silent |
+| `echo "$HOME"`, `git status`, `ls` | None | Nothing |
+| `git status; echo commit` | None (matched per subcommand) | Nothing |
 
-### 埋まらない穴
+### Holes that remain
 
-次の場合は PostToolUse では気づけず、Stop で気づくことになります。
+PostToolUse can't catch these, so the Stop hook is what notices them.
 
-- git の alias（`git ci` など）や `gh api` による PR 作成、`make` などの別プログラムの中で行われるコミット。
-- 失敗した Bash 呼び出し。PostToolUse は成功したツール呼び出しにしか発火せず、失敗は PostToolUseFailure になります。`git commit ... && git push` で push が失敗すると、コミットは済んでいても監査は出ません。
-- 逆に `git log --grep commit` や `echo "git commit"` のような無関係なコマンドでも監査が走ることがあります。ドリフトが実際にあるときに事実を伝えるだけで、何も止めません。
-- 1つのコマンドにコミットと PR 作成の両方があると、メッセージは2回出ます。
+- Git aliases (such as `git ci`), PRs created with `gh api`, and commits made inside another program such as `make`.
+- Failed Bash calls. PostToolUse fires only for tool calls that succeed, and a failure fires PostToolUseFailure instead. If `git commit ... && git push` fails at the push, the commit is made but no audit appears.
+- In the other direction, unrelated commands such as `git log --grep commit` or `echo "git commit"` can run the audit. It only reports drift that is really there, and it stops nothing.
+- A single command that both commits and creates a PR gets the note twice.
 
-## 助言型と fail-open
+## Advisory and fail-open
 
-- どちらのイベントも助言だけです。PostToolUse はツールの実行後に走るので、コミットや PR 作成そのものは止めません。
-- Stop は `decision: "block"` ではなく `hookSpecificOutput.additionalContext` を返します。ドキュメントは、設計どおりに動いて助言を返すフックにこちらを勧めています。ターンを続ける点とループ防止は `block` と同じです。hook error ではなく、hook の追加コンテキストとして Claude に届きます（T3 のセッションでは「Stop hook additional context」と表示され、トランスクリプトの `hookErrors` は空でした）。続いたターンが終わるときの Stop には `stop_hook_active: true` が付くので、そこでは黙ります。ターンを続けるのは1ターンにつき1回です。
-- 想定外のエラーでは何も出さず、exit 0 で抜けます。不正な `--hook` 引数も同じ扱いです。
-- 登録コマンド末尾の `|| true` も同じ目的です。スクリプトの無いブランチへ切り替えると、python は exit 2 を返します。PostToolUse では exit 2 の stderr が Claude に見えてしまいます。Stop でも、現行の Claude Code は stdout が空で stderr がファイル不在を示す exit 2 を止めないエラーとして扱いますが、`|| true` で両方とも exit 0 にそろえています。
-- `|| true` のためにシェル形式（`args` なし）で登録しています。パスは `"$CLAUDE_PROJECT_DIR/..."` と引用符で囲んでいます。ファミリー名を引数にするのは、シェル形式のコマンドに `*` を書くと sh が展開してしまうからです。
-- `timeout` は 60 秒です。git の呼び出しは1回あたり最大 10 秒で、最大 3 回です。既定の 600 秒より短くし、万一固まってもターンの終わりを長く待たせません。タイムアウトした出力は捨てられ、何も起きません。
-- `onFailure` は付けていません。既定で処理は続行され、Stop には効かない設定だからです。
+- Both events only advise. PostToolUse runs after the tool, so it never stops the commit or the PR creation itself.
+- Stop returns `hookSpecificOutput.additionalContext` rather than `decision: "block"`. The docs recommend this form for a hook that is working as designed and giving guidance. It keeps the turn going, with the same loop protection as `block`. It reaches Claude as added hook context, not as a hook error (in a T3 session it showed as "Stop hook additional context", and the transcript's `hookErrors` was empty). The Stop at the end of the continued turn carries `stop_hook_active: true`, and the hook stays silent there, so it keeps a turn going at most once.
+- On an unexpected error it prints nothing and exits 0. Malformed `--hook` arguments are treated the same way.
+- The `|| true` at the end of each registered command serves the same purpose. On a branch without the script, python exits 2. On PostToolUse, the stderr of an exit 2 would reach Claude. On Stop, current Claude Code treats an exit 2 with empty stdout and a missing-file stderr as a non-blocking error, but `|| true` makes both exit 0 regardless.
+- Because of `|| true`, the commands are registered in shell form (no `args`). The path is quoted as `"$CLAUDE_PROJECT_DIR/..."`. The handlers pass a family name rather than the pattern because sh would expand a `*` in a shell-form command.
+- `timeout` is 60 seconds. Each git call takes at most 10 seconds, and there are at most 3. That is shorter than the 600-second default, so a stuck run never holds up the end of a turn for long. Output from a run that times out is discarded, and nothing happens.
+- `onFailure` is not set. The default lets the action go ahead, and the setting has no effect on Stop.
 
-## 必要な Claude Code
+## Claude Code version
 
-`if` は 2.1.85 から、Stop の `additionalContext` は 2.1.163 から使えます。`if` の判定はその後の版でも何度か直されているので（2.1.163、2.1.243 など）、この README の表は 2.1.319 での実測として読んでください。
+`if` is available from 2.1.85, and Stop's `additionalContext` from 2.1.163. The `if` matching has been fixed several times since (2.1.163, 2.1.243 and others), so read the tables in this README as measurements on 2.1.319.
 
-T3 の claudeAgent ランタイムと `claude -p` で発火を確認しています。新しい worktree を対話的に開く場合は、先に Claude Code の信頼ダイアログが出ます。
+Firing is confirmed in T3's claudeAgent runtime and with `claude -p`. When you open a new worktree interactively, Claude Code shows its trust dialog first.
 
-## 手動で実行する
+## Running it by hand
 
 ```sh
 python3 .claude/hooks/skill_audit.py --check
 ```
 
-exit 0 はドリフトなし、exit 1 はドリフトありです。exit 2 は、使い方の誤りか、`origin/main` が無いなどで監査できなかった場合です。
+Exit 0 means no drift, and exit 1 means drift. Exit 2 means a usage error, or that the audit couldn't run, for example because `origin/main` is missing.
 
-## 知っておくこと
+## Things to know
 
-- `git fetch` はしません。手元の `origin/main` を基点にするので、古いと main に入った変更までブランチの変更として数えることがあります。
-- 監査するのは、スクリプトが置かれたチェックアウト、つまりセッションを始めたプロジェクトです。セッションの途中で worktree に入っても `$CLAUDE_PROJECT_DIR` は元の場所を指すので、監査対象は移りません。T3 はセッションを worktree の中で始めるので、この差は出ません。
-- 本当に skill に影響がない変更でも、そのブランチでは `SKILL.md` を変更しない限りドリフトのままです。Stop はターンごとに1回続けさせます。その場合は影響がない旨を PR 説明に書いて、そのまま終えてください。
+- It doesn't run `git fetch`. It uses the local `origin/main` as the base, so when that is stale it can count changes that already landed on main as changes on the branch.
+- It audits the checkout the script sits in, which is the project the session started in. If the session enters a worktree partway through, `$CLAUDE_PROJECT_DIR` still points at the original place, so the audit doesn't follow. T3 starts its sessions inside the worktree, so this gap doesn't arise there.
+- A change that really doesn't affect the skill still counts as drift on its branch until `SKILL.md` changes, and Stop keeps one turn going each time. In that case, say in the PR description that the skill isn't affected, and finish as usual.

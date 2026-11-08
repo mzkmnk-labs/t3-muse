@@ -31,8 +31,10 @@ bridge's design and security notes, see `bridge/README.md`.
 - When you change anything `skills/t3-muse-starter/SKILL.md` describes
   (`bridge/`, `tools/`, `installer/`, `docs/`, the READMEs), update the skill in
   the same PR.
-- Write `README.md` in English and `README.ja.md` in Japanese, and keep their
-  content in sync.
+- Write docs in English by default. When a doc also has a Japanese version,
+  name it `<name>.ja.md` beside the English `<name>.md`, as with `README.md`
+  and `README.ja.md` or `setup.md` and `setup.ja.md`, and keep the content of
+  each pair in sync.
 
 ## Security boundaries
 
