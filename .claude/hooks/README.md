@@ -7,13 +7,13 @@
 現在のブランチと `origin/main` の merge-base からの変更集合（コミット済み、ステージ済み、未ステージの追跡対象変更）を計算します。対象領域が変更されているのに `SKILL.md` が変更集合に含まれない状態をドリフトとして報告します。
 
 - 対象領域：`bridge/`、`tools/`、`installer/`、`docs/`、`README.md`、`README.ja.md`
-- 対象外：`skills/`、`.claude/`、`hooks/`、テスト（`test_*`、`*_test.*`、`tests/` 以下）
+- 対象外：`skills/`、`.claude/`（この監査自体と登録設定）、テスト（`test_*`、`*_test.*`、`tests/` 以下）
 
 領域テーブルは `skill_audit.py` の `SKILL_SURFACE` の1か所にあります。
 
 ## いつ発火するか
 
-`.claude/settings.json` に登録しています。Claude Code はフックをセッション開始時に読み込むため、追加や変更は次のセッションから効きます。
+Claude Code の規約どおり、スクリプトは `.claude/hooks/` に置き、`.claude/settings.json` から `$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py` として登録しています。Claude Code はフックをセッション開始時に読み込むため、追加や変更は次のセッションから効きます。
 
 | イベント | 条件 | 動き |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ T3 の claudeAgent セッションと `claude -p` で発火を確認していま
 ## 手動で実行する
 
 ```sh
-python3 hooks/skill_audit.py --check
+python3 .claude/hooks/skill_audit.py --check
 ```
 
 exit 0 はドリフトなし、exit 1 はドリフトあり、exit 2 は使い方の誤りか、`origin/main` が無いなどで監査できなかった場合です。

@@ -20,7 +20,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# This file lives at .claude/hooks/skill_audit.py, three levels below the root.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 BASE_REF = "origin/main"
 SKILL_PATH = "skills/t3-muse-starter/SKILL.md"
 GIT_TIMEOUT_SECONDS = 10
@@ -33,8 +34,7 @@ AUDITED_COMMANDS = ("git commit", "gh pr create")
 # and any other entry is one exact file. A path outside this table never counts
 # as drift, which keeps these out on purpose:
 #   skills/   the skill itself
-#   .claude/  the wiring of this audit
-#   hooks/    this audit
+#   .claude/  this audit and its wiring
 SKILL_SURFACE = (
     "bridge/",  # mailbox daemon, restarter, LaunchAgent plists
     "tools/",  # t3r, t3w, t3a
