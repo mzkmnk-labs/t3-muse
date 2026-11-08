@@ -18,6 +18,8 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - t3-muse lets Muse manage work in T3 Code on the user's Mac. Muse is the PM and T3 Code does the implementation.
 
+- Setup starts in chat. The user sends you one sentence that points at setup.md, or at setup.ja.md in Japanese, on raw.githubusercontent.com, and you lead from there. The installer is not the entry point but a step you hand the user in chat when you reach it, like the token prompt, copying the MCP URL and approving the sign-in.
+
 - Setup builds two channels. The official T3 MCP over T3 Connect carries thread operations. The file mailbox bridge covers what MCP cannot do: it reads the T3 database, relays approval and question answers, restarts the daemon and stands in when Connect is down.
 
 - This skill ends once setup is verified. Day-to-day work, from dispatching briefs to relaying approvals and merging, belongs to the companion skill T3 Muse PM in skills/t3-muse-pm/, which the last step here places.
@@ -26,7 +28,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 ## Set up the bridge on the Mac
 
-- Install with the npx installer first. Ask the user to run npx @mzkmnk-labs/t3-muse install in a terminal on the Mac. It places the bridge and its tools, loads both LaunchAgents and checks bridge-ping, t3r health and t3a pending through the mailbox.
+- Prefer the npx installer to the manual route. When you reach this step, ask the user in chat to run npx @mzkmnk-labs/t3-muse install in a terminal on the Mac. It places the bridge and its tools, loads both LaunchAgents and checks bridge-ping, t3r health and t3a pending through the mailbox.
 
 - Expect the token prompt on a machine with no token file. The installer asks No t3a token found. Issue one now? [y/N], and the answer is the user's to give. Only y issues the token. If they decline, or the installer runs without a terminal, it stops at t3a pending with NO_TOKEN until t3a issue-token has run and install is run again.
 

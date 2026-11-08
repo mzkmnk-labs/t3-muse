@@ -6,9 +6,35 @@ A companion for working with T3 Code from Meta Muse.
 
 ## Getting started
 
-[setup.md](setup.md) is a setup instruction written for Muse. To set up
-t3-muse on your Mac, give it to your Muse and ask it to read the file and
-set up t3-muse.
+Send your Muse this sentence:
+
+```text
+Read https://raw.githubusercontent.com/mzkmnk-labs/t3-muse/main/setup.md and set up t3-muse for me.
+```
+
+[setup.md](setup.md) is a setup instruction written for Muse. Muse reads
+it, runs the setup, and stops to tell you in chat whenever a step needs
+you. Before you send it, make sure T3 Code is running on your Mac and
+Node.js 24 or later is installed there.
+
+Only you can take these steps, and Muse asks for each one when it gets
+there:
+
+- **Run the installer.** Run the command Muse gives you,
+  `npx @mzkmnk-labs/t3-muse install`, in a terminal on the Mac. A first
+  install asks whether to issue the t3a token, which relays your answers
+  to T3 Code's pending approvals and questions. The answer is yours.
+- **Copy the MCP URL.** Enable T3 Connect in the T3 Code environment
+  settings, then copy the environment's MCP URL from a client connected
+  through T3 Connect, such as the web app, and give it to Muse. A URL
+  copied on the host Mac can be a LAN address, which Muse cannot reach.
+- **Approve the sign-in.** When Muse starts the OAuth sign-in for its
+  connector, approve it in the T3 Code app and pick an access mode. The
+  mode caps everything Muse can do through the connector.
+
+Muse never takes these steps for you, and never decides approvals or
+answers to T3 Code's questions on its own. To run the installer yourself,
+see [Manual setup](#manual-setup).
 
 ## Architecture
 
@@ -102,7 +128,14 @@ PAT instead.
 | `skills/t3-muse-starter/` | The custom Muse skill for setting up t3-muse from scratch: the bridge, the MCP connector and verification. [setup.md](setup.md) has Muse place this one, and its last step places the PM skill |
 | `skills/t3-muse-pm/` | The custom Muse skill for running t3-muse day to day, with Muse as PM and T3 Code as the implementer: dispatching, relaying approvals and questions, monitoring, merging and maintenance |
 
-## Installing on the Mac
+## Manual setup
+
+During setup, Muse asks you to run the installer when it gets to that
+step. This section is for running it yourself: to install or update the
+Mac side without Muse walking you through it, or to check on or remove
+an install. The installer covers only the Mac side, the bridge and its
+tools. Connecting the MCP and placing the skills still happen in Muse, so
+send it the sentence in [Getting started](#getting-started) afterwards.
 
 ```sh
 npx @mzkmnk-labs/t3-muse install            # place the files, load both LaunchAgents, verify
@@ -137,7 +170,8 @@ credential is a heavier step than one prompt. Replace it with `t3a.py renew`.
 Running `install` again is safe, and it is also how to update. It replaces
 the shipped files and leaves the token and the audit history alone. It
 changes nothing while requests are waiting in the inbox, because restarting
-the bridge would run them twice. For the manual steps, see `bridge/README.md`.
+the bridge would run them twice. To place the files without the installer,
+see `bridge/README.md`.
 
 ## Answering approvals and questions
 

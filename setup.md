@@ -3,9 +3,14 @@
 English | [日本語](setup.ja.md)
 
 This file is a setup instruction for Muse to read. To set up t3-muse,
-give this file to your Muse and ask, for example, "Read setup.md and set
-up t3-muse." Muse runs the setup from there and tells you in chat
-whenever it needs you.
+send your Muse this sentence:
+
+```text
+Read https://raw.githubusercontent.com/mzkmnk-labs/t3-muse/main/setup.md and set up t3-muse for me.
+```
+
+Muse runs the setup from there and tells you in chat whenever it needs
+you.
 
 The rest of this file is addressed to Muse.
 
