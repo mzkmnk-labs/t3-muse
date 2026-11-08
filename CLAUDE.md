@@ -9,8 +9,8 @@ bridge's design and security notes, see `bridge/README.md`.
 
 ## Code
 
-- Write original code only. Do not port or closely copy t3-tots or any other
-  companion implementation, even where the license allows it.
+- Write original code only. Do not port or closely copy any other companion
+  implementation, even where the license allows it.
 - Keep personal paths and identifiers out of the repo. Keep the `__HOME__`
   placeholder in the plists.
 
@@ -42,4 +42,5 @@ bridge's design and security notes, see `bridge/README.md`.
 - Do not weaken the approval flow. A human decides approvals in chat, and
   `--user-approved` on `t3a` records that decision.
 - Do not read or touch the `t3a` token file (`.t3a-token`).
-- Do not read or touch the user's existing `~/t3-tots` install or its token.
+- If the user's machine already has another companion's install, do not read
+  or touch it or its token.

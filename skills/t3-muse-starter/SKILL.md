@@ -24,7 +24,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Act as PM rather than implementer. Break work into briefs, dispatch them to T3, track progress, verify results and report back to the user.
 
-- Keep the user's existing t3-tots install untouched if one exists, and never open its token file.
+- Keep another companion's existing install on the user's machine untouched if one exists, and never open its token file.
 
 ## Set up the bridge on the Mac
 
@@ -124,7 +124,7 @@ Use this skill to set up t3-muse from scratch on a fresh machine and to run it d
 
 - Keep personal paths and identifiers out of the repository. The plists keep the __HOME__ placeholder and expansion happens only at install time on the Mac.
 
-- Write original code only. Do not port or closely copy t3-tots or any other companion implementation, even where a license would allow it.
+- Write original code only. Do not port or closely copy any other companion implementation, even where a license would allow it.
 
 - Check the quarantine attribute first when a LaunchAgent load fails with error 5, check for a Cloudflare 1010 body when the relay returns 403, and check that the credential was attached when it returns 401.
 
