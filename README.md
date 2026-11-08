@@ -125,8 +125,9 @@ PAT instead.
 | `bridge/` | The always-on Mac bridge (path 2). Receives requests through the file mailbox via the paired device and runs allowlisted commands only (design notes in `bridge/README.md`) |
 | `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `renew` / `pending` / `answer`) |
 | `installer/`, `package.json` | The npm package `@mzkmnk-labs/t3-muse`: a Node CLI with no dependencies that installs the bridge and tools on the Mac (`install` / `status` / `uninstall`) |
-| `skills/t3-muse-starter/` | The custom Muse skill for setting up t3-muse from scratch: the bridge, the MCP connector and verification. [setup.md](setup.md) has Muse place this one, and its last step places the PM skill |
-| `skills/t3-muse-pm/` | The custom Muse skill for running t3-muse day to day, with Muse as PM and T3 Code as the implementer: dispatching, relaying approvals and questions, monitoring, merging and maintenance |
+| `muse/skills/t3-muse-starter/` | The custom Muse skill for setting up t3-muse from scratch: the bridge, the MCP connector and verification. [setup.md](setup.md) has Muse place this one, and its last step places the PM and bridge skills |
+| `muse/skills/t3-muse-pm/` | The custom Muse skill for running t3-muse day to day, with Muse as PM and T3 Code as the implementer: dispatching, relaying approvals and questions, monitoring, merging and maintenance |
+| `muse/skills/t3-muse-bridge/` | The custom Muse skill for using the bridge: the request and reply format, each allowlisted command with its arguments and errors, and restarting and stopping the daemon |
 
 ## Manual setup
 

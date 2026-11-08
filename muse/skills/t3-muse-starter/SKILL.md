@@ -1,18 +1,16 @@
 # T3 Muse Starter
 
-Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge, connect the official T3 MCP, verify the whole path, and place the T3 Muse PM skill that runs it day to day.
+Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge, connect the official T3 MCP, verify the whole path, and place the T3 Muse PM and T3 Muse Bridge skills that run it day to day.
 
 ## Stay current
 
-- Treat this skill as a map rather than the territory. The repository code and its docs define the bridge side, and the live server discovery documents, the server tool list and your connector doc define the MCP side.
+- Send every bridge request in this setup as the T3 Muse Bridge skill describes. It is in muse/skills/t3-muse-bridge/ of the t3-muse repository, and the last step here places it; until then, read it there.
 
-- Follow those sources over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
+- Check the MCP side against the live server discovery documents, the server tool list and your connector doc. Follow them over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
 
 - Read the numbers and behaviors named here as observations from the build they were verified against. T3 Code ships as a fast moving Nightly, so re-check the cheap facts before relying on them, such as the tool schemas in the server tool list, the expiry printed when a token is issued, and how long a held request survives before the relay cuts it.
 
 - Expect the relay to cut a long held request at around two minutes with an HTTP 524, and design every wait to be re-armed rather than held once for a long stretch.
-
-- Update this skill in the same change whenever you fix a behavior it describes, and keep the copy in the repository in step with the copy Muse loads.
 
 ## Understand the shape
 
@@ -22,7 +20,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Setup builds two channels. The official T3 MCP over T3 Connect carries thread operations. The file mailbox bridge covers what MCP cannot do: it reads the T3 database, relays approval and question answers, restarts the daemon and stands in when Connect is down.
 
-- This skill ends once setup is verified. Day-to-day work, from dispatching briefs to relaying approvals and merging, belongs to the companion skill T3 Muse PM in skills/t3-muse-pm/, which the last step here places.
+- This skill ends once setup is verified. Day-to-day work belongs to two companion skills, which the last step here places: T3 Muse PM in muse/skills/t3-muse-pm/, from dispatching briefs to relaying approvals and merging, and T3 Muse Bridge in muse/skills/t3-muse-bridge/, for sending bridge requests and reading their replies.
 
 - Keep another companion's existing install on the user's machine untouched if one exists, and never open its token file.
 
@@ -80,18 +78,8 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Once that read passes, write the day the user approved the sign-in and the token's expires_at into the record you keep across chats, as Keep the credentials current in T3 Muse PM describes, so day-to-day work starts with both clocks known.
 
-## Place the PM skill
+## Place the day-to-day skills
 
-- As the last setup step, place the companion skill. Take the skills/t3-muse-pm/ folder (SKILL.md and skill.yaml) from the same t3-muse repository and put it in the user's custom skills folder at ~/workspace/custom-skills/t3-muse-pm/, the same way setup.md had you place this skill.
+- As the last setup step, place the two companion skills from the same t3-muse repository, the same way setup.md had you place this skill. Put the muse/skills/t3-muse-pm/ folder (SKILL.md and skill.yaml) in the user's custom skills folder at ~/workspace/custom-skills/t3-muse-pm/, and the muse/skills/t3-muse-bridge/ folder (SKILL.md and skill.yaml) at ~/workspace/custom-skills/t3-muse-bridge/.
 
-- Report the verification results to the user and tell them that day-to-day work now runs through T3 Muse PM.
-
-## Change this repository
-
-- Update docs/architecture.svg, docs/architecture.ja.svg and both README files whenever the architecture changes. README.md and docs/architecture.svg are English, and README.ja.md and docs/architecture.ja.svg are Japanese.
-
-- Keep this skill truthful as the surfaces move. When a T3 Code or Muse update changes a behavior named here, ship the skill correction with the same pull request that adapts to it.
-
-- Keep personal paths and identifiers out of the repository. The plists keep the __HOME__ placeholder and expansion happens only at install time on the Mac.
-
-- Write original code only. Do not port or closely copy any other companion implementation, even where a license would allow it.
+- Report the verification results to the user and tell them that day-to-day work now runs through T3 Muse PM, with T3 Muse Bridge for the bridge.

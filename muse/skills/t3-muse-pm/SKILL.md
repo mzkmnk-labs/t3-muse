@@ -4,15 +4,13 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 ## Stay current
 
-- Treat this skill as a map rather than the territory. The repository code and its docs define the bridge side, and the live server discovery documents, the server tool list and your connector doc define the MCP side.
+- Use the T3 Muse Bridge skill (muse/skills/t3-muse-bridge/) for how to send bridge requests, what each allowlisted command takes and how to read its reply.
 
-- Follow those sources over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
+- Check the MCP side against the live server discovery documents, the server tool list and your connector doc. Follow them over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
 
 - Read the numbers and behaviors named here as observations from the build they were verified against. T3 Code ships as a fast moving Nightly, so re-check the cheap facts before relying on them, such as the tool schemas in the server tool list, the expiry printed when a token is issued, and how long a held request survives before the relay cuts it.
 
 - Expect the relay to cut a long held request at around two minutes with an HTTP 524, and design every wait to be re-armed rather than held once for a long stretch.
-
-- Update this skill in the same change whenever you fix a behavior it describes, and keep the copy in the repository in step with the copy Muse loads.
 
 ## Work as PM
 
@@ -24,7 +22,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Use the file mailbox bridge for what MCP cannot do. It reads the T3 database, relays approval and question answers, restarts the daemon and acts as a fallback when Connect is down.
 
-- Run the setup in the T3 Muse Starter skill (skills/t3-muse-starter/, entered from setup.md) first when the bridge or the connector is not in place yet.
+- Run the setup in the T3 Muse Starter skill (muse/skills/t3-muse-starter/, entered from setup.md) first when the bridge or the connector is not in place yet.
 
 - Keep another companion's existing install on the user's machine untouched if one exists, and never open its token file.
 
@@ -46,7 +44,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Never decide an approval or an answer yourself. Detect the pending request, tell the user what is being asked in this chat, and relay only the decision the user makes.
 
-- Answer approvals through t3a. An approve or deny answer requires the flag --user-approved at both the bridge validator and the tool, and it records that the human decided in chat.
+- Answer approvals with t3a answer through the bridge, in the form the T3 Muse Bridge skill gives. Add --user-approved only to relay a decision the user made in this chat, because the flag records that the human decided.
 
 - Check the current tool description before relying on what the MCP pending request respond action can answer. In the build this skill was written against it covers user questions only and cannot approve a permission request, so approvals go through t3a.
 
@@ -98,7 +96,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Test the grant with one cheap MCP read, such as the project list, at the first liveness check of each day you work, and record the day it passed. An authentication error sends you to the grant recovery below.
 
-- Renew the token once 14 days or fewer remain before the recorded expires_at, rather than waiting for t3a to answer TOKEN_REJECTED. Run t3a renew through the bridge with a 300 second timeout while T3 Code is running. This is the normal route, and it also works once the token has expired. It issues a new token into a 0600 temp file, proves it with a pending list, swaps it in with an atomic rename and only then revokes the old session. A failure before the swap leaves the token file untouched. Report the facts it prints to the user, which are expires_at, old_session and, when one older session was found, previous_expires_at, and write the new expires_at into the record.
+- Renew the token once 14 days or fewer remain before the recorded expires_at, rather than waiting for t3a to answer TOKEN_REJECTED. Run t3a renew through the bridge while T3 Code is running, in the form and with the timeout the T3 Muse Bridge skill gives. This is the normal route, and it also works once the token has expired. A renew that fails before it swaps in the new token leaves the token file untouched. Report the facts it prints to the user, which are expires_at, old_session and, when one older session was found, previous_expires_at, and write the new expires_at into the record.
 
 - Treat the manual steps as the fallback. When old_session comes back left_active nothing was revoked, because renew revokes only what the session lists prove is the old session. Follow the note it prints: on the Mac, use the bundled T3 CLI session list and revoke commands and keep the t3-muse session issued last, because it belongs to the new token. When renew cannot run or the token is no longer wanted, revoke the session with those commands and delete the token file, then run issue-token again only to reissue.
 
@@ -116,29 +114,13 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 ## Maintain and troubleshoot
 
-- Replace bridge or tool files through the device file channel, verify them by reading back, and restart the daemon through the restart trigger instead of asking the user to run launchctl.
+- Replace bridge or tool files and restart the daemon as the T3 Muse Bridge skill describes, instead of asking the user to run launchctl.
 
 - Check the quarantine attribute first when a LaunchAgent load fails with error 5, and check for a Cloudflare 1010 body when the relay returns 403. When a request returns 401, check that a hand written client attached the credential, and for a call through the connector, follow the grant recovery in Keep the credentials current.
 
-- Pass a project id or path to t3w list. A bare list fails from the tools folder because no project matches the current directory.
-
-- Expect t3r to fall back to an immutable read when T3 Code is stopped and the database refuses a plain read only open. It reports the open mode it used.
-
-- Read t3r status from the orchestration_v2 projection tables, and check its source field before trusting it. It says legacy when those tables are missing and status has fallen back to the old projection tables, which stopped updating in early October 2026 on the build this was verified against.
-
-- Read session_status in v2 output as the latest run status, or idle with no runs, the same values the MCP thread list reports. Expect subagent threads only when they have a pending request, even though the waiting counts always include them.
+- Look up the meaning of a t3r, t3w or t3a reply in the T3 Muse Bridge skill, from the t3r status fields, open mode and source to each error code.
 
 - Never read the authentication tables or the scheduled task webhook secrets in the T3 database.
-
-## Change this repository
-
-- Update docs/architecture.svg, docs/architecture.ja.svg and both README files whenever the architecture changes. README.md and docs/architecture.svg are English, and README.ja.md and docs/architecture.ja.svg are Japanese.
-
-- Keep this skill truthful as the surfaces move. When a T3 Code or Muse update changes a behavior named here, ship the skill correction with the same pull request that adapts to it.
-
-- Keep personal paths and identifiers out of the repository. The plists keep the __HOME__ placeholder and expansion happens only at install time on the Mac.
-
-- Write original code only. Do not port or closely copy any other companion implementation, even where a license would allow it.
 
 ## Available connectors
 
@@ -146,4 +128,4 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Use the GitHub connector to read pull requests and to merge with approval. Use a contents scoped token client only for files under .github/workflows, which the GitHub App cannot push.
 
-- Use the paired Mac device channel to place files and mailbox requests. It has no shell, so every Mac side action goes through the bridge allowlist or through a plist the user loads once.
+- Use the paired Mac device channel to place files and mailbox requests. It has no shell, so every Mac side action goes through the bridge allowlist, as the T3 Muse Bridge skill describes, or through a plist the user loads once.
