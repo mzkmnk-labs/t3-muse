@@ -78,6 +78,8 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Finish verification with one harmless MCP read such as the project list before dispatching real work.
 
+- Once that read passes, write the day the user approved the sign-in and the token's expires_at into the record you keep across chats, as Keep the credentials current in T3 Muse PM describes, so day-to-day work starts with both clocks known.
+
 ## Place the PM skill
 
 - As the last setup step, place the companion skill. Take the skills/t3-muse-pm/ folder (SKILL.md and skill.yaml) from the same t3-muse repository and put it in the user's custom skills folder at ~/workspace/custom-skills/t3-muse-pm/, the same way setup.md had you place this skill.
