@@ -2,83 +2,74 @@
 
 English | [日本語](setup.ja.md)
 
-You give Muse one prompt, and Muse sets up t3-muse on your Mac by
-following its starter skill. It does most of the work itself and stops
-to tell you what to do at the few steps only you can take.
+This file is a setup instruction for Muse to read. To set up t3-muse,
+give this file to your Muse and ask, for example, "Read setup.md and set
+up t3-muse." Muse runs the setup from there and tells you in chat
+whenever it needs you.
 
-## Before you start
+The rest of this file is addressed to Muse.
 
-- T3 Code is running on your Mac.
-- You have a Muse account.
+## Prerequisites
+
+Confirm these with the user before you start:
+
+- T3 Code is running on the user's Mac.
+- The user has a Muse account.
 - Node.js 18 or later is installed on the Mac.
 
-## The prompt to give Muse
+## Steps
 
-Paste this into a chat with Muse:
+### 1. Place the starter skill
 
-```text
-Please set up t3-muse for me.
+Fetch the repository https://github.com/mzkmnk-labs/t3-muse and place its
+`skills/t3-muse-starter/` folder (`SKILL.md` and `skill.yaml`) in the
+user's custom skills folder at `~/workspace/custom-skills/t3-muse-starter/`.
 
-Fetch the repository https://github.com/mzkmnk-labs/t3-muse and place its skills/t3-muse-starter/ folder (SKILL.md and skill.yaml) into my custom skills folder at ~/workspace/custom-skills/t3-muse-starter/.
+### 2. Follow the skill
 
-Then follow that skill (T3 Muse Starter) to run the setup. Whenever a step needs me — running npx @mzkmnk-labs/t3-muse install in a terminal, answering the token prompt, enabling T3 Connect in T3 Code and giving you the MCP URL, approving the connection — tell me exactly what to do. Decisions on approvals and questions are mine to make.
-```
+Run the setup by following the skill you placed, T3 Muse Starter.
 
-## What happens next
+### 3. Hand the user the steps only they can take
 
-Muse places the skill and works through it. These are the steps where
-it needs you, in order.
+At each of these steps, stop and tell the user in chat exactly what to
+do, then wait for them.
 
-### 1. Run the installer and answer the token prompt
+- **Run the installer.** Ask the user to run
+  `npx @mzkmnk-labs/t3-muse install` in a terminal on the Mac. It places
+  the bridge and its tools, loads two LaunchAgents, and checks
+  `bridge-ping`, `t3r health` and `t3a pending` through the mailbox.
+- **Answer the token prompt.** A first install asks
+  `No t3a token found. Issue one now? [y/N]`. Tell the user that `y`
+  issues the t3a token, which relays their answers to T3 Code's pending
+  approvals and questions, and that its value is never printed. The answer
+  is theirs. Any other answer leaves the install unfinished, so once they
+  run `python3 ~/t3-muse-tools/t3a.py issue-token`, have them run
+  `install` again.
+- **Enable T3 Connect and pass you the MCP URL.** Ask the user to enable
+  T3 Connect in the T3 Code environment settings, then copy the
+  environment's MCP URL and give it to you. They must copy it from a
+  client that is itself connected through T3 Connect, such as the web
+  app. Warn them that a URL copied on the host Mac can be a LAN address,
+  which you cannot reach and which cannot complete sign-in.
+- **Approve the connection and pick an access mode.** Once you have
+  registered the URL as a custom connector and started the sign-in, ask
+  the user to approve it in the T3 Code app and pick an access mode. Tell
+  them the mode caps everything you can do through the connector, so it
+  has to allow the thread launches the setup will run.
 
-Muse asks you to run this in a terminal on the Mac:
+Never take these steps for the user, and never decide approvals or
+answers to T3 Code's questions yourself.
 
-```sh
-npx @mzkmnk-labs/t3-muse install
-```
-
-It places the bridge and its tools, loads two LaunchAgents and checks
-the path end to end. A first install has no approval token yet, so it
-asks:
-
-```text
-No t3a token found. Issue one now? [y/N]
-```
-
-Answer `y`. The token lets t3-muse relay your answers to T3 Code's
-pending approvals and questions. The installer prints the token's scopes,
-its 90-day lifetime and where the file is, but never the token itself.
-
-Any other answer leaves the install unfinished. When you're ready, run
-`python3 ~/t3-muse-tools/t3a.py issue-token` and then `install` again.
-
-### 2. Enable T3 Connect and copy the MCP URL
-
-In T3 Code, enable T3 Connect in the environment settings. Copy the
-environment's MCP URL and give it to Muse.
-
-Copy the URL from a client that is itself connected through T3 Connect,
-such as the web app. On the host Mac the URL can be a LAN address, which
-Muse cannot reach and which cannot complete sign-in.
-
-### 3. Approve the connection and pick an access mode
-
-Muse registers the URL as a custom connector and starts the sign-in.
-Approve it in the T3 Code app and pick an access mode. The mode caps
-everything Muse can do through the connector, so pick one that allows
-the thread launches you want Muse to make.
-
-## How you know it's done
+## Done when
 
 - `bridge-ping` through the mailbox answers with a pong.
 - `t3r health` succeeds.
 - `t3a pending` returns an empty list.
 - A read through the MCP, such as listing projects, succeeds.
 
-The installer prints `install complete.` once the first three pass, and
-Muse runs all four and reports the results.
+Report the results to the user.
 
-## Good to know
+## Also tell the user
 
 **Stopping it.** Unloading the bridge's LaunchAgent plists, or deleting
 the bridge folder `~/t3-muse-bridge`, stops everything. That is the kill
@@ -91,13 +82,13 @@ launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist ~/Library/Launch
 **Uninstalling.** `npx @mzkmnk-labs/t3-muse uninstall` unloads both
 LaunchAgents and deletes their plists, and keeps the data folders.
 `npx @mzkmnk-labs/t3-muse uninstall --purge` also deletes
-`~/t3-muse-bridge` and `~/t3-muse-tools` once you confirm. Deleting the
-token file does not end its T3 session, which stays valid until it
+`~/t3-muse-bridge` and `~/t3-muse-tools` once the user confirms. Deleting
+the token file does not end its T3 session, which stays valid until it
 expires. The installer prints how to revoke it.
 
 **Credential lifetimes.**
 
 | Credential | Lifetime | To renew |
 |---|---|---|
-| MCP connector grant | About 30 days | Approve the connection again |
-| t3a approval token | 90 days | Run `t3a renew`, which Muse does through the bridge |
+| MCP connector grant | About 30 days | Have the user approve the connection again |
+| t3a approval token | 90 days | Run `t3a renew` through the bridge |

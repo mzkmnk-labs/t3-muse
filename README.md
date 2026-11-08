@@ -6,8 +6,9 @@ A companion for working with T3 Code from Meta Muse.
 
 ## Getting started
 
-To set up t3-muse on your Mac, follow [setup.md](setup.md). It lists
-what you need and the prompt to give Muse.
+[setup.md](setup.md) is a setup instruction written for Muse. To set up
+t3-muse on your Mac, give it to your Muse and ask it to read the file and
+set up t3-muse.
 
 ## Architecture
 

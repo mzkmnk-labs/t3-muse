@@ -6,7 +6,7 @@ T3 Code を Meta Muse から扱うためのコンパニオン。
 
 ## はじめ方
 
-Mac に t3-muse をセットアップするには、[setup.ja.md](setup.ja.md) の手順に従う。必要なものと、Muse に渡すプロンプトが載っている。
+[setup.ja.md](setup.ja.md) は Muse が読むためのセットアップ指示書である。Mac に t3-muse をセットアップするには、このファイルを自分の Muse に渡し、読んでセットアップするよう頼む。
 
 ## 構成図
 
