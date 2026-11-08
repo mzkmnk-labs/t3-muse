@@ -1,6 +1,6 @@
 {
   "name": "@mzkmnk-labs/t3-muse",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Installs the Mac side of t3-muse: the file mailbox bridge daemon and its tools.",
   "repository": {
     "type": "git",
