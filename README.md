@@ -52,8 +52,8 @@ then saves what it saw. The watcher is a plain poll and never holds
 - Muse keeps the watcher alive itself, and no resident guardian runs
   outside the chat. Before a dispatch, a follow-up or a report on the
   state of T3, the main chat checks that the watcher is enabled, turns it
-  back on if not, and marks the target threads as running and not yet
-  reported in the state file. Right after a launch, status can still read
+  back on if not, and marks each target thread that has no entry yet, or
+  has ended, as running and not yet reported in the state file. Right after a launch, status can still read
   idle because no run has been recorded yet, and the mark keeps the
   watcher from taking the thread for idle.
 - A thread that was reported as ended and runs again, for example after a
