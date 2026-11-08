@@ -6,7 +6,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook post-tool || true"
+            "if": "Bash(*git *commit*)",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook post-tool commit || true",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "if": "Bash(*gh pr create*)",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook post-tool pr-create || true",
+            "timeout": 60
           }
         ]
       }
@@ -16,7 +24,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook stop || true"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill_audit.py\" --hook stop || true",
+            "timeout": 60
           }
         ]
       }
