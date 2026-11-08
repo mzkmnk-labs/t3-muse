@@ -752,6 +752,7 @@ class Package(InstallerCase):
     def test_manifest(self):
         manifest = json.loads((REPO / "package.json").read_text())
         self.assertEqual(manifest["name"], "@mzkmnk-labs/t3-muse")
+        self.assertEqual(manifest["license"], "MIT")
         self.assertEqual(set(manifest["files"]), PACKAGED)
         self.assertEqual(manifest["bin"], {"t3-muse": "installer/t3-muse.js"})
         self.assertEqual(LIFECYCLE_SCRIPTS & set(manifest.get("scripts", {})), set())
@@ -767,8 +768,9 @@ class Package(InstallerCase):
             ["npm", "pack", "--json", "--pack-destination", str(packed)],
             cwd=REPO, capture_output=True, text=True, check=True).stdout
         contents = {entry["path"] for entry in json.loads(output)[0]["files"]}
+        # npm adds LICENSE to every tarball, whatever "files" lists.
         self.assertEqual({path for path in contents if not path.upper().startswith("README")},
-                         PACKAGED | {"package.json"})
+                         PACKAGED | {"package.json", "LICENSE"})
 
         tarball = next(packed.glob("*.tgz"))
         with tarfile.open(tarball) as tar:
