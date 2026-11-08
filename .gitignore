@@ -1,2 +1,5 @@
 # t3a.py session token and renew's temp files, if the tool is ever run from a checkout
 tools/.t3a-token*
+
+# Python bytecode, from running the tests or the compile check in a checkout
+__pycache__/

@@ -182,8 +182,12 @@ class InstallerCase(unittest.TestCase):
         (stubs / "python3").symlink_to(sys.executable)
         self.preload = self.root / "preload.cjs"
         self.preload.write_text(PRELOAD)
+        # The stubs are Python, and the macOS system Python writes its bytecode
+        # cache under $HOME/Library/Caches/com.apple.python, which here is the
+        # fixture HOME the tests compare.
         self.env = dict(os.environ, HOME=str(self.home), STUB_STATE=str(self.state),
-                        PATH=f"{stubs}{os.pathsep}{os.environ['PATH']}")
+                        PATH=f"{stubs}{os.pathsep}{os.environ['PATH']}",
+                        PYTHONDONTWRITEBYTECODE="1")
 
         # The safety catch: stop here rather than touch a real install.
         self.assertEqual(shutil.which("launchctl", path=self.env["PATH"]),
@@ -768,7 +772,11 @@ class Package(InstallerCase):
 
         tarball = next(packed.glob("*.tgz"))
         with tarfile.open(tarball) as tar:
-            tar.extractall(packed, filter="data")
+            # Python 3.9.6, the macOS system Python, predates extraction filters.
+            if hasattr(tarfile, "data_filter"):
+                tar.extractall(packed, filter="data")
+            else:
+                tar.extractall(packed)
 
         self.seed_t3()
         self.no_pending()
