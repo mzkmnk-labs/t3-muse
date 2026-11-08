@@ -2,14 +2,14 @@
 
 [English](README.md) | 日本語
 
-Muse 用の3つの skill、`skills/t3-muse-starter/SKILL.md`（セットアップ）、`skills/t3-muse-pm/SKILL.md`（日常の運用）、`skills/t3-muse-bridge/SKILL.md`（ブリッジの使い方）が、記述しているドキュメントや実装と静かに食い違っていくのを防ぐための repo 内部の道具です。skill は bridge やツール、インストーラ、図、README、セットアップ手順の挙動を記述しています。しかし、そちらを変えても skill まで直されるとは限りません。対象の面が変わったのにどの skill も直っていない状態をドリフトと呼び、コミットと PR 作成の時点と、ターンの終わりに Claude へ知らせます。
+Muse 用の3つの skill、`muse/skills/t3-muse-starter/SKILL.md`（セットアップ）、`muse/skills/t3-muse-pm/SKILL.md`（日常の運用）、`muse/skills/t3-muse-bridge/SKILL.md`（ブリッジの使い方）が、記述しているドキュメントや実装と静かに食い違っていくのを防ぐための repo 内部の道具です。skill は bridge やツール、インストーラ、図、README、セットアップ手順の挙動を記述しています。しかし、そちらを変えても skill まで直されるとは限りません。対象の面が変わったのにどの skill も直っていない状態をドリフトと呼び、コミットと PR 作成の時点と、ターンの終わりに Claude へ知らせます。
 
 ## 何をするか
 
 現在のブランチと `origin/main` の merge-base からの変更集合を計算します。コミット済み、ステージ済み、未ステージの、追跡対象の変更が含まれます。対象領域が変更されているのに、3つの `SKILL.md` のいずれも変更集合に含まれない状態を、ドリフトとして報告します。3つのうち少なくとも1つが変更されていれば、skill を更新したものとして扱います。対象領域は3つの skill で共有しているので、あるパスがどの skill に属するかは監査では判定せず、変更する人に任せます。
 
 - 対象領域：`bridge/`、`tools/`、`installer/`、`docs/`、`README.md`、`README.ja.md`、`setup.md`、`setup.ja.md`
-- 対象外：`skills/`、`.claude/`（この監査自体と登録設定）、テスト（`test_*`、`*_test.*`、`tests/` 以下）
+- 対象外：`muse/skills/`、`.claude/`（この監査自体と登録設定）、テスト（`test_*`、`*_test.*`、`tests/` 以下）
 
 領域テーブルは `skill_audit.py` の `SKILL_SURFACE` の1か所にあり、保護対象の3ファイルはその隣の `SKILL_PATHS` です。`skill.yaml` だけの変更は数えません。
 

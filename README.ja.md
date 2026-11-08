@@ -65,9 +65,9 @@ Muse がこれらを代わりに行うことはなく、承認や T3 Code の質
 | `bridge/` | Mac 常駐ブリッジ (経路2)。ペアデバイス経由のファイルメールボックスで、許可リストのコマンドだけを実行する (設計は `bridge/README.md`) |
 | `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `renew` / `pending` / `answer`) |
 | `installer/`、`package.json` | npm パッケージ `@mzkmnk-labs/t3-muse`。ブリッジとツールを Mac に導入する、依存パッケージなしの Node CLI (`install` / `status` / `uninstall`) |
-| `skills/t3-muse-starter/` | t3-muse をまっさらな状態からセットアップするための Muse 用カスタム skill。ブリッジ、MCP コネクタ、動作確認を扱う。[setup.ja.md](setup.ja.md) で Muse が最初に配置し、最後の手順で PM skill とブリッジ skill を配置する |
-| `skills/t3-muse-pm/` | t3-muse を日々運用するための Muse 用カスタム skill。Muse が PM、T3 Code が実装を担当し、dispatch、承認・質問の中継、監視、マージ、保守を扱う |
-| `skills/t3-muse-bridge/` | ブリッジを使うための Muse 用カスタム skill。リクエストと返信の形式、許可リストの各コマンドの引数とエラー、デーモンの再起動と止め方を扱う |
+| `muse/skills/t3-muse-starter/` | t3-muse をまっさらな状態からセットアップするための Muse 用カスタム skill。ブリッジ、MCP コネクタ、動作確認を扱う。[setup.ja.md](setup.ja.md) で Muse が最初に配置し、最後の手順で PM skill とブリッジ skill を配置する |
+| `muse/skills/t3-muse-pm/` | t3-muse を日々運用するための Muse 用カスタム skill。Muse が PM、T3 Code が実装を担当し、dispatch、承認・質問の中継、監視、マージ、保守を扱う |
+| `muse/skills/t3-muse-bridge/` | ブリッジを使うための Muse 用カスタム skill。リクエストと返信の形式、許可リストの各コマンドの引数とエラー、デーモンの再起動と止め方を扱う |
 
 ## 手動セットアップ
 

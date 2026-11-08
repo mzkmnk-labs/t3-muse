@@ -27,7 +27,7 @@ Confirm these with the user before you start:
 ### 1. Place the starter skill
 
 Fetch the repository https://github.com/mzkmnk-labs/t3-muse and place its
-`skills/t3-muse-starter/` folder (`SKILL.md` and `skill.yaml`) in the
+`muse/skills/t3-muse-starter/` folder (`SKILL.md` and `skill.yaml`) in the
 user's custom skills folder at `~/workspace/custom-skills/t3-muse-starter/`.
 
 ### 2. Follow the skill

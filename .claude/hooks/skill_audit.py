@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Audit whether the three t3-muse skills kept up with this branch.
 
-skills/t3-muse-starter/SKILL.md (setup), skills/t3-muse-pm/SKILL.md (day to day
-operation) and skills/t3-muse-bridge/SKILL.md (using the bridge) describe the
-bridge, the tools, the installer, the docs and the setup steps, but nothing
-forces a change to one of those to touch a skill as well, so the skills and what
-they describe drift apart silently. This compares the branch with origin/main
-and reports drift when a path the skills describe has changed and none of the
-SKILL.md files has.
+muse/skills/t3-muse-starter/SKILL.md (setup), muse/skills/t3-muse-pm/SKILL.md
+(day to day operation) and muse/skills/t3-muse-bridge/SKILL.md (using the
+bridge) describe the bridge, the tools, the installer, the docs and the setup
+steps, but nothing forces a change to one of those to touch a skill as well, so
+the skills and what they describe drift apart silently. This compares the
+branch with origin/main and reports drift when a path the skills describe has
+changed and none of the SKILL.md files has.
 
   --check                    report for people; exit 0 clean, 1 drift, 2 usage or git error
   --hook post-tool [FAMILY]  Claude Code PostToolUse hook for a git commit or gh pr create
@@ -29,9 +29,9 @@ BASE_REF = "origin/main"
 # A change to any one counts as keeping the skills up to date. The surface
 # below is shared, so the audit does not try to say which skill a path needs.
 SKILL_PATHS = (
-    "skills/t3-muse-starter/SKILL.md",  # setup
-    "skills/t3-muse-pm/SKILL.md",  # day to day operation
-    "skills/t3-muse-bridge/SKILL.md",  # using the bridge
+    "muse/skills/t3-muse-starter/SKILL.md",  # setup
+    "muse/skills/t3-muse-pm/SKILL.md",  # day to day operation
+    "muse/skills/t3-muse-bridge/SKILL.md",  # using the bridge
 )
 GIT_TIMEOUT_SECONDS = 10
 
@@ -48,8 +48,8 @@ AUDITED_COMMANDS = {
 # The areas the skills describe. An entry ending in "/" covers that directory
 # and any other entry is one exact file. A path outside this table never counts
 # as drift, which keeps these out on purpose:
-#   skills/   the skills themselves
-#   .claude/  this audit and its wiring
+#   muse/skills/  the skills themselves
+#   .claude/      this audit and its wiring
 SKILL_SURFACE = (
     "bridge/",  # mailbox daemon, restarter, LaunchAgent plists
     "tools/",  # t3r, t3w, t3a

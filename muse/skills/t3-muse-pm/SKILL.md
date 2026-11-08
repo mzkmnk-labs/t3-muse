@@ -4,7 +4,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 ## Stay current
 
-- Use the T3 Muse Bridge skill (skills/t3-muse-bridge/) for how to send bridge requests, what each allowlisted command takes and how to read its reply.
+- Use the T3 Muse Bridge skill (muse/skills/t3-muse-bridge/) for how to send bridge requests, what each allowlisted command takes and how to read its reply.
 
 - Check the MCP side against the live server discovery documents, the server tool list and your connector doc. Follow them over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
 
@@ -22,7 +22,7 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Use the file mailbox bridge for what MCP cannot do. It reads the T3 database, relays approval and question answers, restarts the daemon and acts as a fallback when Connect is down.
 
-- Run the setup in the T3 Muse Starter skill (skills/t3-muse-starter/, entered from setup.md) first when the bridge or the connector is not in place yet.
+- Run the setup in the T3 Muse Starter skill (muse/skills/t3-muse-starter/, entered from setup.md) first when the bridge or the connector is not in place yet.
 
 - Keep another companion's existing install on the user's machine untouched if one exists, and never open its token file.
 

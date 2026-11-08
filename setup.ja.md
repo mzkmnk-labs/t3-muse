@@ -24,7 +24,7 @@ https://raw.githubusercontent.com/mzkmnk-labs/t3-muse/main/setup.ja.md を読ん
 
 ### 1. starter skill を配置する
 
-リポジトリ https://github.com/mzkmnk-labs/t3-muse を取得し、その中の `skills/t3-muse-starter/` (`SKILL.md` と `skill.yaml`) を、ユーザーのカスタムスキル置き場 `~/workspace/custom-skills/t3-muse-starter/` に配置する。
+リポジトリ https://github.com/mzkmnk-labs/t3-muse を取得し、その中の `muse/skills/t3-muse-starter/` (`SKILL.md` と `skill.yaml`) を、ユーザーのカスタムスキル置き場 `~/workspace/custom-skills/t3-muse-starter/` に配置する。
 
 ### 2. skill に従う
 

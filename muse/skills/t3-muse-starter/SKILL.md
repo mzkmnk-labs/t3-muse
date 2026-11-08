@@ -4,7 +4,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 ## Stay current
 
-- Send every bridge request in this setup as the T3 Muse Bridge skill describes. It is in skills/t3-muse-bridge/ of the t3-muse repository, and the last step here places it; until then, read it there.
+- Send every bridge request in this setup as the T3 Muse Bridge skill describes. It is in muse/skills/t3-muse-bridge/ of the t3-muse repository, and the last step here places it; until then, read it there.
 
 - Check the MCP side against the live server discovery documents, the server tool list and your connector doc. Follow them over this skill whenever they disagree, and say so in chat when a step here no longer matches reality.
 
@@ -20,7 +20,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Setup builds two channels. The official T3 MCP over T3 Connect carries thread operations. The file mailbox bridge covers what MCP cannot do: it reads the T3 database, relays approval and question answers, restarts the daemon and stands in when Connect is down.
 
-- This skill ends once setup is verified. Day-to-day work belongs to two companion skills, which the last step here places: T3 Muse PM in skills/t3-muse-pm/, from dispatching briefs to relaying approvals and merging, and T3 Muse Bridge in skills/t3-muse-bridge/, for sending bridge requests and reading their replies.
+- This skill ends once setup is verified. Day-to-day work belongs to two companion skills, which the last step here places: T3 Muse PM in muse/skills/t3-muse-pm/, from dispatching briefs to relaying approvals and merging, and T3 Muse Bridge in muse/skills/t3-muse-bridge/, for sending bridge requests and reading their replies.
 
 - Keep another companion's existing install on the user's machine untouched if one exists, and never open its token file.
 
@@ -80,6 +80,6 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 ## Place the day-to-day skills
 
-- As the last setup step, place the two companion skills from the same t3-muse repository, the same way setup.md had you place this skill. Put the skills/t3-muse-pm/ folder (SKILL.md and skill.yaml) in the user's custom skills folder at ~/workspace/custom-skills/t3-muse-pm/, and the skills/t3-muse-bridge/ folder (SKILL.md and skill.yaml) at ~/workspace/custom-skills/t3-muse-bridge/.
+- As the last setup step, place the two companion skills from the same t3-muse repository, the same way setup.md had you place this skill. Put the muse/skills/t3-muse-pm/ folder (SKILL.md and skill.yaml) in the user's custom skills folder at ~/workspace/custom-skills/t3-muse-pm/, and the muse/skills/t3-muse-bridge/ folder (SKILL.md and skill.yaml) at ~/workspace/custom-skills/t3-muse-bridge/.
 
 - Report the verification results to the user and tell them that day-to-day work now runs through T3 Muse PM, with T3 Muse Bridge for the bridge.

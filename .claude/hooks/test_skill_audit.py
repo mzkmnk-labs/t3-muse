@@ -15,14 +15,14 @@ import skill_audit  # noqa: E402
 
 SCRIPT = Path(__file__).with_name("skill_audit.py")
 SETTINGS = Path(__file__).resolve().parent.parent / "settings.json"
-STARTER_SKILL = "skills/t3-muse-starter/SKILL.md"
-PM_SKILL = "skills/t3-muse-pm/SKILL.md"
-BRIDGE_SKILL = "skills/t3-muse-bridge/SKILL.md"
+STARTER_SKILL = "muse/skills/t3-muse-starter/SKILL.md"
+PM_SKILL = "muse/skills/t3-muse-pm/SKILL.md"
+BRIDGE_SKILL = "muse/skills/t3-muse-bridge/SKILL.md"
 SKILLS = (STARTER_SKILL, PM_SKILL, BRIDGE_SKILL)
 SKILL_METADATA = (
-    "skills/t3-muse-starter/skill.yaml",
-    "skills/t3-muse-pm/skill.yaml",
-    "skills/t3-muse-bridge/skill.yaml",
+    "muse/skills/t3-muse-starter/skill.yaml",
+    "muse/skills/t3-muse-pm/skill.yaml",
+    "muse/skills/t3-muse-bridge/skill.yaml",
 )
 RULE = "このリポジトリでは、skill が記述する面を変えたら同じ変更で、その面を記述している skill の SKILL.md も更新します。本当に影響がない場合は、その旨を PR 説明に書きます。"
 HEREDOC_COMMIT = """git commit -m "$(cat <<'EOF'
@@ -128,8 +128,10 @@ class FindDriftTests(unittest.TestCase):
     def test_siblings_of_the_skills_do_not_clear_drift(self):
         for sibling in (
             *SKILL_METADATA,
-            "skills/t3-muse-other/SKILL.md",
-            "skills/SKILL.md",
+            "muse/skills/t3-muse-other/SKILL.md",
+            "muse/skills/SKILL.md",
+            # The skills' old home before they moved under muse/.
+            "skills/t3-muse-pm/SKILL.md",
         ):
             with self.subTest(sibling=sibling):
                 drift = skill_audit.find_drift({"tools/t3w.py", sibling})
