@@ -191,7 +191,7 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 | Command after `"python3", "t3a.py"` | Does | timeout |
 |---|---|---|
-| `"issue-token"` | Issues the approval token, once | 120 |
+| `"issue-token"` | Issues the approval token, once, and only on the user's explicit yes, as NO_TOKEN below describes | 120 |
 | `"renew"` | Replaces the token with a new one | 300 |
 | `"pending"` | Lists every request waiting on a human | 120 |
 | `"answer", <request-id>, "approve", "--user-approved"` | Approves one approval request | 120 |
@@ -251,7 +251,7 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 | 7 | SERVER_REJECTED |
 
 - Act on the common codes like this:
-  - NO_TOKEN: there is no token file, or it holds no usable token. Tell the user, and run issue-token once they agree, as the installer asks them at setup. When a file is there but unusable, issue-token refuses with TOKEN_EXISTS, so the user deletes the file on the Mac first.
+  - NO_TOKEN: there is no token file, or it holds no usable token. Issuing one is the user's decision, and at setup the installer's prompt puts it to them in their own terminal first. Run issue-token only when the setup stopped without a token, because the prompt never appeared or the user said no to it, and only once the user has agreed explicitly in chat. Any answer but y at the prompt is a no, so never issue the token right after it. If the token is needed, explain again what it is for and ask once more. After setup, as when the file has gone missing, ask the same way before you issue one. When a file is there but unusable, issue-token refuses with TOKEN_EXISTS, so the user deletes the file on the Mac first.
   - TOKEN_REJECTED: the token has expired or been revoked. Run renew, then relay the answer again.
   - TOKEN_INSECURE: the token file is readable by others or cannot be opened safely, as with a symlink. Tell the user, who fixes it to 0600 on the Mac, or revokes and reissues it if it may have been copied.
   - T3_NOT_RUNNING: ask the user to start T3 Code.
@@ -283,16 +283,21 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 ## Stop the bridge
 
-- Stopping is the user's kill switch, run on the Mac:
-  - Unload both LaunchAgents: `launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`.
-  - Or run `npx @mzkmnk-labs/t3-muse uninstall`, which unloads both and deletes their plists but keeps the data folders. `uninstall --purge` also deletes ~/t3-muse-bridge and ~/t3-muse-tools once the user confirms.
-  - Or delete the folder ~/t3-muse-bridge.
+- Stopping the bridge is the user's kill switch for the bridge path only, run on the Mac. The MCP connector keeps working, as the last point here describes.
+
+- Unload both LaunchAgents to stop it: `launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`. The plists stay in ~/Library/LaunchAgents, so launchd loads both again at the next login.
+
+- To keep it stopped, the user runs `npx @mzkmnk-labs/t3-muse uninstall`, which unloads both and deletes their plists but keeps the data folders. `uninstall --purge` also deletes ~/t3-muse-bridge and ~/t3-muse-tools once the user confirms, after it has unloaded both.
+
+- Deleting the folder ~/t3-muse-bridge alone does not stop the bridge. The running daemon keeps watching the inbox path, and runs any request written there once the folder exists again. Unload first, then delete the folder if it is no longer wanted.
 
 - With only the bridge unloaded, a restart trigger fails with exit=113 and does not start it again.
 
 - Requests left in inbox run as soon as the bridge is back, and the installer refuses to run while any are there. Delete the ones that are no longer wanted.
 
 - Deleting the token file does not end its T3 session, which stays valid until it expires. The user revokes it with `~/.t3/bin/t3 auth session list` and `~/.t3/bin/t3 auth session revoke <id>`.
+
+- The MCP connector is a separate path, and nothing above touches it. Its grant lives in T3 Code, so the user stops it in the T3 Code settings by revoking the connected client, or by turning T3 Connect off, which also cuts their other clients that come in through it. That is done in T3 Code itself, and neither the bridge nor anything else in t3-muse can do it for them.
 
 ## Keep within bounds
 
