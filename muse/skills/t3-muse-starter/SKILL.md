@@ -20,6 +20,8 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Setup builds two channels. The official T3 MCP over T3 Connect carries thread operations. The file mailbox bridge covers what MCP cannot do: it reads the T3 database, relays approval and question answers, restarts the daemon and stands in when Connect is down.
 
+- Require the Mac to be paired with Muse as a device before you set up the bridge. You place every mailbox request and read every reply through that pairing, so without it the bridge cannot be verified or used. The MCP channel does not need it. If the Mac is not paired, ask the user to open the Muse app on that Mac and pair it, and confirm you can reach it as a device before you go on. The installer's own checks run locally on the Mac, so a passing install says nothing about the pairing.
+
 - This skill ends once setup is verified. Day-to-day work belongs to two companion skills, which the last step here places: T3 Muse PM in muse/skills/t3-muse-pm/, from dispatching briefs to relaying approvals and merging, and T3 Muse Bridge in muse/skills/t3-muse-bridge/, for sending bridge requests and reading their replies.
 
 - Keep another companion's existing install on the user's machine untouched if one exists, and never open its token file.
@@ -70,7 +72,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 ## Verify the whole path
 
-- Send a bridge-ping request through the mailbox and require a pong before trusting the bridge.
+- Send a bridge-ping request through the mailbox and require a pong before trusting the bridge. When you cannot reach the Mac or cannot place the request in inbox, check the pairing first, as Understand the shape describes. When the request is in place but no pong comes, the daemon is the suspect, so follow the T3 Muse Bridge skill for a bridge that does not reply.
 
 - Run t3r health and t3w list for a known project through the bridge and check that both succeed. Pass a project id or path to t3w list, because a bare list fails from the tools folder when no project matches the current directory.
 

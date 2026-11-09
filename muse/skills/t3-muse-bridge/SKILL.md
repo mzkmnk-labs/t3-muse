@@ -8,6 +8,8 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 - You reach the Mac through the paired Mac device channel, which reads and writes files and has no shell. Every action on the Mac goes through a request in this mailbox, a file in the restart trigger folder, or a step you ask the user to run in a terminal.
 
+- That channel exists only once the Mac is paired with Muse as a device. Without the pairing you have no way to place a request or read a reply, so nothing in this skill works. Ask the user to open the Muse app on that Mac and pair it. The MCP connector does not depend on it.
+
 - These paths sit under ~/t3-muse-bridge on the Mac:
 
 | Path | Role |
