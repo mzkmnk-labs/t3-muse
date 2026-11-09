@@ -92,9 +92,16 @@ gives the cron's prompt template and the state file's format.
 - When the bridge read fails, or status reports the `legacy` source, the
   watcher falls back to the MCP thread list. When both fail it stays
   silent, so a transient error never becomes a false report.
+- When a thread of the project is waiting, the run also reads
+  `t3a pending` through the bridge and tracks each pending request by its
+  `request_id`, so a second approval in a thread that stays waiting is
+  reported too, with its summary. A run with no usable `t3a` reply, as
+  when the token has expired, falls back to the waiting counts in status.
 - A run counts as idle when nothing is active and nothing was reported.
   After 15 consecutive idle runs, about 30 minutes, the watcher disables
-  itself, and Muse's next check turns it back on.
+  itself, and Muse's next check turns it back on. A run that cannot
+  disable its own cron marks that in the state file and says so once, and
+  Muse's next check disables it in its place.
 
 Key points:
 

@@ -30,7 +30,9 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-muse-bri
 - 任意のシェルコマンドは実行できない。SSH のようなフルシェル権限にはならない
 - ネットワークの待ち受けポートなし。入力はローカルフォルダのファイルだけ
 - リクエスト/結果はすべて done/ と outbox/ に残るので後から監査できる
-- 止め方: 2 つの plist を unload する（`launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`）、またはフォルダごと削除
+- 止め方: 2 つの LaunchAgent を unload すると、ブリッジの daemon と再起動役が止まる（`launchctl unload ~/Library/LaunchAgents/com.muse.t3bridge.plist ~/Library/LaunchAgents/com.muse.t3bridge-restarter.plist`）。これがブリッジ経路だけの kill switch で、MCP コネクタは T3 Code の設定で別に止める
+  - plist は `~/Library/LaunchAgents` に残るので、次のログインで launchd がまた load する。止めたままにするには `npx @mzkmnk-labs/t3-muse uninstall` を実行する
+  - フォルダ `~/t3-muse-bridge` を削除するだけでは止まらない。動いている daemon は inbox を見張り続け、フォルダがまたできれば、そこに書かれた依頼を実行する。先に unload し、フォルダが不要ならその後で削除する
 
 ## 導入
 
