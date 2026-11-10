@@ -52,7 +52,6 @@ PACKAGED = {
     "tools/t3r.py",
     "tools/t3w.py",
     "tools/t3a.py",
-    "tools/t3g.py",
 }
 LIFECYCLE_SCRIPTS = {"preinstall", "install", "postinstall", "prepare", "prepack", "postpack"}
 
@@ -357,8 +356,7 @@ class Install(InstallerCase):
                                ("bridge/restart-bridge.sh", self.bridge / "restart-bridge.sh"),
                                ("tools/t3r.py", self.tools / "t3r.py"),
                                ("tools/t3w.py", self.tools / "t3w.py"),
-                               ("tools/t3a.py", self.tools / "t3a.py"),
-                               ("tools/t3g.py", self.tools / "t3g.py")):
+                               ("tools/t3a.py", self.tools / "t3a.py")):
             self.assertEqual(target.read_bytes(), (REPO / source).read_bytes(), target)
         self.assertEqual((self.bridge / "restart-bridge.sh").stat().st_mode & 0o777, 0o755)
         for name in ("inbox", "outbox", "done", "restart-trigger"):
@@ -656,7 +654,6 @@ class Status(InstallerCase):
         self.assertRegex(proc.stdout, rf"{RESTARTER} +loaded")
         self.assertRegex(proc.stdout, r"bridge-ping +pong")
         self.assertRegex(proc.stdout, r"t3a\.py +present")
-        self.assertRegex(proc.stdout, r"t3g\.py +present")
         self.assertRegex(proc.stdout, r"t3a token file +present")
         self.assertEqual(self.launchctl_changes(), [])
         self.assertEqual(self.daemon_pid(), pid)

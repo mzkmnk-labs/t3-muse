@@ -24,7 +24,7 @@ Muse がこれらを代わりに行うことはなく、承認や T3 Code の質
 
 ## 構成図
 
-![構成図。ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) を経由して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行う。watcher はブリッジでの読み取りが失敗したとき、このスレッド一覧にフォールバックする。経路2 (ファイルメールボックス・ブリッジ): Muse がペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py、t3w.py、t3a.py、t3g.py に対して許可したコマンドだけ実行する。t3r.py は MCP にない DB 参照を担い、T3 Code 状態 DB を読み取り専用で開く。watcher は 2 分ごとにメールボックス経由で t3r.py の status を取得する。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問への回答のみで承認には答えられないため、この経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。t3g.py はユーザーが頼んだ GitHub リポジトリを、ユーザー自身の git の認証情報を使って ghq で ghq root に取得し、T3 のプロジェクトとして登録できるようにする。T3 Code は DB を読み書きする。別に、メールボックスの restart-trigger に置いたファイルで launchd が番人の restart-bridge.sh を起動し、ブリッジのジョブだけを再起動する。](docs/architecture.ja.svg)
+![構成図。ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) を経由して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行う。watcher はブリッジでの読み取りが失敗したとき、このスレッド一覧にフォールバックする。経路2 (ファイルメールボックス・ブリッジ): Muse がペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスが Muse に結果 JSON を返す。bridge.py は inbox をポーリングし、t3r.py、t3w.py、t3a.py に対して許可したコマンドだけ実行する。t3r.py は MCP にない DB 参照を担い、T3 Code 状態 DB を読み取り専用で開く。watcher は 2 分ごとにメールボックス経由で t3r.py の status を取得する。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問への回答のみで承認には答えられないため、この経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成・送信を行い、CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。別に、メールボックスの restart-trigger に置いたファイルで launchd が番人の restart-bridge.sh を起動し、ブリッジのジョブだけを再起動する。](docs/architecture.ja.svg)
 
 ユーザーは製品である Muse と対話し、Muse が PM としてタスクを T3 Code に dispatch する。経路は 2 つある。
 
@@ -35,7 +35,6 @@ Muse がこれらを代わりに行うことはなく、承認や T3 Code の質
 - `t3r.py`: `statev2.sqlite` を読み取り専用で参照する。watcher はこの `status` をポーリングする
 - `t3a.py`: 承認・質問への回答を中継する。中継するのはユーザーがチャットで決めた内容だけで、承認には `--user-approved` が必須
 - `t3w.py`: MCP が使えないときのフォールバック
-- `t3g.py`: GitHub のリポジトリを `ghq get` で Mac に取得する。ユーザーがターミナルでコマンドを実行しなくても、Muse が T3 のプロジェクトとして登録できる
 
 番人の `restart-bridge.sh` は、`restart-trigger` にファイルが置かれるとデーモンを再起動する。
 
@@ -53,8 +52,7 @@ Muse がこれらを代わりに行うことはなく、承認や T3 Code の質
 要点:
 
 - メールボックス経路では、Mac から Muse へ能動的に接続する手段はない。Muse がペアデバイス経由でファイルを置きに・取りに行く
-- ブリッジはネットワークを待ち受けず、許可リスト (`bridge-ping`、`t3r.py` の読み取り系、`t3w.py` のタスク依頼系、`t3a.py` の回答中継系、`t3g.py` のリポジトリ取得) 以外は実行しない
-- ブリッジのツールで Mac の外と通信するのは `t3g.py` だけ。`https://github.com/<owner>/<repo>` を、ghq root の下の決まった場所へ、ユーザー自身の git の認証情報でクローンする。手作業の `ghq get` と同じく、リポジトリが指定するサブモジュールも、それぞれのホストから取得する。リクエストから URL、フラグ、環境変数は渡せず、git はターミナルで認証情報を求めない
+- ブリッジはネットワークを待ち受けず、許可リスト (`bridge-ping`、`t3r.py` の読み取り系、`t3w.py` のタスク依頼系、`t3a.py` の回答中継系) 以外は実行しない
 - DB への直接アクセスは読み取り専用のみ。T3 への作業依頼は公式 MCP が既定で、MCP が使えないときだけ T3 純正 CLI 経由 (`t3w.py`) を使う。どちらもユーザーの依頼に基づく場合に限る。権限承認への回答は `t3a.py` だけ。T3 の承認待ち・質問待ちへの回答は、ユーザーが決めた場合に限る
 - ブリッジは自分自身を再起動できないため、別の launchd ジョブが担当する。`~/t3-muse-bridge/restart-trigger` にファイルを置くと `restart-bridge.sh` が動き、ブリッジのジョブだけを再起動する。ブリッジ本体に `launchctl` の権限は増えない
 
@@ -66,7 +64,7 @@ Muse がこれらを代わりに行うことはなく、承認や T3 Code の質
 | パス | 内容 |
 |---|---|
 | `bridge/` | Mac 常駐ブリッジ (経路2)。ペアデバイス経由のファイルメールボックスで、許可リストのコマンドだけを実行する (設計は `bridge/README.md`) |
-| `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `renew` / `pending` / `answer`)。`t3g.py` は GitHub のリポジトリを `ghq get` で ghq root に取得し、T3 のプロジェクトとして登録できるようにする (`get`) |
+| `tools/` | Mac 側の自前ツール群で、ブリッジから実行する (経路2)。`t3r.py` は T3 Code の状態 DB を読み取り専用で引く最小リーダー (`schema` / `health` / `status`)。`t3w.py` は MCP が使えないときに T3 純正 `t3 thread` CLI 経由でタスク依頼を行うライター (`start` / `send` / `show` / `list` / `add-project`)。`t3a.py` は T3 の承認待ち・質問待ちへのユーザーの回答を中継する (`issue-token` / `renew` / `pending` / `answer`) |
 | `installer/`、`package.json` | npm パッケージ `@mzkmnk-labs/t3-muse`。ブリッジとツールを Mac に導入する、依存パッケージなしの Node CLI (`install` / `status` / `uninstall`) |
 | `muse/skills/t3-muse-starter/` | t3-muse をまっさらな状態からセットアップするための Muse 用カスタム skill。ブリッジ、MCP コネクタ、動作確認を扱う。[setup.ja.md](setup.ja.md) で Muse が最初に配置し、最後の手順で PM skill とブリッジ skill を配置する |
 | `muse/skills/t3-muse-pm/` | t3-muse を日々運用するための Muse 用カスタム skill。Muse が PM、T3 Code が実装を担当し、dispatch、承認・質問の中継、監視、マージ、保守を扱う |

@@ -52,7 +52,7 @@ AUDITED_COMMANDS = {
 #   .claude/      this audit and its wiring
 SKILL_SURFACE = (
     "bridge/",  # mailbox daemon, restarter, LaunchAgent plists
-    "tools/",  # t3r, t3w, t3a, t3g
+    "tools/",  # t3r, t3w, t3a
     "installer/",  # the npx install command
     "docs/",  # architecture diagrams
     "README.md",  # setup and operation, English

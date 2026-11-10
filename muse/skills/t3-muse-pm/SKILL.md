@@ -46,8 +46,6 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - When the task is a different piece of work, start a new thread for it, even inside the same project, rather than adding it to a thread that is on something else.
 
-- Fetch a repository the user asked for that is not on the Mac yet with t3g get through the bridge, and take the checkout path from its reply. The user then needs no terminal step.
-
 - Register a repository as a T3 project first when it is missing, using t3w add-project through the bridge or an MCP read to confirm the project id.
 
 - Run the watcher liveness check in Monitor, report and merge before every dispatch and every follow up, so completions are reported without the user asking.
@@ -235,7 +233,7 @@ You are <watcher name>, the t3-muse watcher for the T3 project <project title>. 
 
 - Check the quarantine attribute first when a LaunchAgent load fails with error 5, and check for a Cloudflare 1010 body when the relay returns 403. When a request returns 401, check that a hand written client attached the credential, and for a call through the connector, follow the grant recovery in Keep the credentials current.
 
-- Look up the meaning of a t3r, t3w, t3a or t3g reply in the T3 Muse Bridge skill, from the t3r status fields, open mode and source to each error code.
+- Look up the meaning of a t3r, t3w or t3a reply in the T3 Muse Bridge skill, from the t3r status fields, open mode and source to each error code.
 
 - Never read the authentication tables or the scheduled task webhook secrets in the T3 database.
 
