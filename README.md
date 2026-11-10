@@ -114,10 +114,12 @@ Key points:
   allowlist (`bridge-ping`, the read-only `t3r.py` commands, the
   task-request `t3w.py` commands, the answer-relay `t3a.py` commands, and
   the repository-fetch `t3g.py get`).
-- `t3g.py` is the only bridge tool that reaches beyond the Mac. It fetches
-  only `https://github.com/<owner>/<repo>`, into a fixed place under the
-  ghq root, with the user's own git credentials. A request cannot pass it a
-  URL, a flag or environment variables, and git never prompts.
+- `t3g.py` is the only bridge tool that reaches beyond the Mac. It clones
+  `https://github.com/<owner>/<repo>` into a fixed place under the ghq
+  root, with the user's own git credentials. Like a manual `ghq get`, the
+  clone also fetches the submodules the repository lists, from wherever
+  they are hosted. A request cannot pass it a URL, a flag or environment
+  variables, and git does not ask for credentials in a terminal.
 - Direct database access is read-only. Task requests to T3 go through the
   official MCP by default and through T3 Code's own CLI (`t3w.py`) only
   when the MCP is unavailable, in both cases only for requests the user

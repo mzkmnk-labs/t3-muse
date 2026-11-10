@@ -272,17 +272,19 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 - `<owner>/<repo>` is the repository's owner and name joined by one /, such as octo-org/web-app, up to 100 characters. Each part starts with a letter or a digit, and the rest are letters, digits, `.`, `_` or `-`. Neither part may contain `..`, and the name must not end in .git. get takes nothing else: no URL, host, branch or option.
 
-- t3g always fetches `https://github.com/<owner>/<repo>` and places it at `<ghq root>/github.com/<owner>/<repo>`. The ghq root is what `ghq root` prints in the bridge's environment, or ~/ghq when it prints nothing usable. A request cannot change the host, the root or the program, because the bridge passes no env to t3g.
+- t3g always clones `https://github.com/<owner>/<repo>` and places it at `<ghq root>/github.com/<owner>/<repo>`. Like a manual ghq get, the clone also fetches the submodules the repository lists, from wherever they are hosted. The ghq root is what `ghq root` prints in the bridge's environment, or ~/ghq when it prints nothing usable. A request cannot change the host, the root or the program, because the bridge passes no env to t3g.
 
 - get prints `{"repo", "url", "path", "status"}`. path is the absolute checkout folder, which t3w add-project takes as it is. status is `cloned`, or `already_present` when the folder was already there. In that case t3g clones nothing and leaves the folder as it is, without updating it or checking what is in it.
 
-- Give get timeout 600. A clone can take minutes, and t3g gives ghq up to 560 seconds, then stops it together with git, which removes the partial clone. A long clone holds back every other bridge request, the watcher's poll included. With a shorter timeout the bridge stops t3g but not ghq, which can go on cloning with nobody waiting. If that happens, wait a few minutes before you send get again, because a folder that a running clone is still filling already counts as already_present.
+- Give get timeout 600. A clone can take minutes, and t3g gives ghq up to 560 seconds, then stops it together with git, which normally removes the partial clone. A long clone holds back every other bridge request, the watcher's poll included. With a shorter timeout the bridge stops t3g but not ghq, which can go on cloning with nobody waiting. If that happens, wait a few minutes before you send get again, because a folder that a running clone is still filling already counts as already_present.
 
-- git never prompts. A private repository clones only when git can reach it with credentials the user's git config already provides, such as a credential helper. Otherwise get fails at once, and the user sets up access on the Mac or runs ghq get in their own terminal.
+- git does not ask for credentials in a terminal. A private repository clones only when git can reach it with credentials the user's git config already provides, such as a credential helper. Otherwise get fails at once, and the user sets up access on the Mac or runs ghq get in their own terminal.
 
 - t3g runs with the bridge daemon's environment, which launchd starts without the user's shell profile. A GHQ_ROOT set only in that profile does not apply, and the user can set the root with `git config --global ghq.root <path>` instead. Tell the user when path is not where they expected it.
 
 - t3g looks for ghq on the daemon's PATH, then in /opt/homebrew/bin and /usr/local/bin, because launchd's PATH leaves Homebrew out.
+
+- On an install from before t3g, the bridge refuses get with `command not on the allowlist`, and a bridge that knows t3g while t3g.py is missing returns exit_code 2 with python's can't open file message in stderr. In both cases argv is not the problem, so ask the user to run `npx @mzkmnk-labs/t3-muse install` again.
 
 - t3g's failures are `{"error": "..."}` on stdout, with ghq's own output in stderr. exit_code tells them apart:
 

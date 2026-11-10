@@ -30,9 +30,10 @@ ghq's own output goes to stderr.
 The bridge daemon runs under launchd, whose PATH leaves out Homebrew, so
 ghq is looked up on PATH and then in /opt/homebrew/bin and /usr/local/bin.
 T3M_GHQ overrides the lookup (used by tests). ghq's folder goes first on
-its PATH, so it finds the git installed beside it. git never prompts
-(GIT_TERMINAL_PROMPT=0): a clone that needs credentials it cannot get
-without asking fails instead of holding up the bridge.
+its PATH, so it finds the git installed beside it. git does not ask for
+credentials in a terminal (GIT_TERMINAL_PROMPT=0): a clone that needs
+credentials it cannot get without asking fails instead of holding up the
+bridge. Like a manual ghq get, the clone also fetches submodules.
 """
 import json
 import os
@@ -123,7 +124,7 @@ def run_get(ghq: str, url: str, env: dict):
         return proc.returncode, output
     except subprocess.TimeoutExpired:
         pass
-    # SIGTERM reaches git as well, which then removes its partial clone.
+    # SIGTERM reaches git as well, which normally removes its partial clone.
     output = ""
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
