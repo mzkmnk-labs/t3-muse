@@ -19,14 +19,15 @@ Muse ──(デバイスチャネル: ファイル読取)──◀ ~/t3-muse-bri
 
 ## セキュリティ
 
-- 実行できるのは許可リストのみ：組み込み `bridge-ping`、自前リーダー `t3r.py` の読み取り専用サブコマンド（`schema` / `health` / `status`）、自前ライター `t3w.py`（`start` / `send` / `show` / `list` / `add-project`）、回答中継 `t3a.py`（`issue-token` / `renew` / `pending` / `answer`）。旧来の外部ツールは許可リストに無い
-- `t3w.py` が唯一の書き込み経路。T3 純正 CLI 経由でスレッド作成とメッセージ送信を行うもので、ブリッジ側で引数の形（スレッド ID の形式、フラグ混入、文字数）を検証する。実行されるのはユーザーが Muse に依頼したリクエストだけ
+- 実行できるのは許可リストのみ：組み込み `bridge-ping`、自前リーダー `t3r.py` の読み取り専用サブコマンド（`schema` / `health` / `status`）、自前ライター `t3w.py`（`start` / `send` / `show` / `list` / `add-project`）、回答中継 `t3a.py`（`issue-token` / `renew` / `pending` / `answer`）、リポジトリ取得 `t3g.py`（`get`）。旧来の外部ツールは許可リストに無い
+- `t3w.py` が T3 Code への唯一の書き込み経路。T3 純正 CLI 経由でスレッド作成とメッセージ送信を行うもので、ブリッジ側で引数の形（スレッド ID の形式、フラグ混入、文字数）を検証する。実行されるのはユーザーが Muse に依頼したリクエストだけ
 - `t3a.py` は T3 の承認待ち・質問待ちへの回答を中継する。ブリッジ側で引数の形を検証する：`issue-token` と `renew` と `pending` は引数なし。`answer` はリクエスト ID の形式に加え、`approve` / `deny` なら末尾の `--user-approved` が必須（無ければブリッジでもツールでも拒否）。それ以外の回答テキストは空でなく 4000 文字以内で、`-` で始まらず、`--user-approved` を付けない
+- `t3g.py` は `get <owner>/<repo>` だけを受け付け、`https://github.com/<owner>/<repo>` を `ghq get` で ghq root の `github.com/<owner>/<repo>` に取得する。ブリッジとツールの両方で引数の形を検証する：`/` でつないだ 2 つの部分で、各部分は英数字で始まり、英数字と `.` `_` `-` だけでできている。`..` を含まず、名前は `.git` で終わらず、全体で 100 文字以内。フラグや追加の引数は受け付けない。フォルダが既にあればクローンせず `already_present` を返す。Mac の外と通信するツールはこれだけで、git は入力を求めない（`GIT_TERMINAL_PROMPT=0`）。ユーザーが頼んだリポジトリにだけ使う
 - `--user-approved` は人が決めたことの記録であり、Muse が自分の判断で付けてはならない。証明ではなく約束なので、監査は done/ に残るリクエストで行う
 - `t3a.py` のトークンは Mac の外に出ず、表示もされない。保存先はツールフォルダの 0600 のファイル `.t3a-token` と、`renew` の実行中だけ使う同じフォルダの 0600 の一時ファイルだけで、CLI の stdout をファイルへ直接流すため、ブリッジの出力にも outbox / done にも現れない。接続先はループバックのみ
 - `renew` は新しいトークンで `pending` を確認してから rename で `.t3a-token` を置き換え、その後で旧セッションを失効させる。置き換え前に失敗すれば `.t3a-token` は変わらない。発行前後の `t3 auth session list` で旧セッションと確定できない場合は何も失効させず、結果に手動の手順を残す
 - Muse はユーザーが決めた内容を中継するだけで、自分の判断では何も承認しない
-- 環境変数の許可はエントリごと：`t3a.py` には `T3M_T3CLI` と `T3M_T3_HOME` だけ、`t3r.py` / `t3w.py` には従来どおり `T3M_DB` と `T3M_T3CLI` だけを渡す
+- 環境変数の許可はエントリごと：`t3a.py` には `T3M_T3CLI` と `T3M_T3_HOME` だけ、`t3r.py` / `t3w.py` には従来どおり `T3M_DB` と `T3M_T3CLI` だけを渡し、`t3g.py` には何も渡さない。`t3g.py` はデーモン自身の環境で動くので、ghq と git はユーザーの通常の HOME と git の設定を使う。リクエストから `GHQ_ROOT`、`GIT_*`、ghq の場所を変えて、置き場所や実行するプログラムを動かすことはできない
 - 任意のシェルコマンドは実行できない。SSH のようなフルシェル権限にはならない
 - ネットワークの待ち受けポートなし。入力はローカルフォルダのファイルだけ
 - リクエスト/結果はすべて done/ と outbox/ に残るので後から監査できる
@@ -66,7 +67,7 @@ Mac 側でチェックアウト（ghq 管理なら worktree）から:
 
 1. `mkdir -p ~/t3-muse-bridge/inbox ~/t3-muse-bridge/outbox ~/t3-muse-bridge/done ~/t3-muse-tools ~/Library/LaunchAgents`
 2. `cp bridge/bridge.py ~/t3-muse-bridge/`
-3. `cp tools/t3r.py tools/t3w.py tools/t3a.py ~/t3-muse-tools/`
+3. `cp tools/t3r.py tools/t3w.py tools/t3a.py tools/t3g.py ~/t3-muse-tools/`
 4. `sed "s|__HOME__|$HOME|g" bridge/com.muse.t3bridge.plist > ~/Library/LaunchAgents/com.muse.t3bridge.plist`
 5. plist をファイル転送で受け取った場合は `xattr -d com.apple.quarantine ~/Library/LaunchAgents/com.muse.t3bridge.plist` で隔離属性を外す。launchd は隔離属性付きの plist を `Load failed: 5` で拒否する
 6. `launchctl load ~/Library/LaunchAgents/com.muse.t3bridge.plist`
@@ -121,6 +122,12 @@ Mac 側でチェックアウト（ghq 管理なら worktree）から:
 {"id": "20261107-004", "argv": ["python3", "t3a.py", "pending"], "timeout": 120}
 {"id": "20261107-005", "argv": ["python3", "t3a.py", "answer", "<request-id>", "deny", "--user-approved"], "timeout": 120}
 {"id": "20261107-006", "argv": ["python3", "t3a.py", "answer", "<request-id>", "回答テキスト"], "timeout": 120}
+```
+
+リポジトリ取得の例（クローンには時間がかかるので `timeout` を 600 にする。ghq は Mac に別途入れておく）:
+
+```json
+{"id": "20261107-008", "argv": ["python3", "t3g.py", "get", "octo-org/web-app"], "timeout": 600}
 ```
 
 結果: `{"id": ..., "ok": true, "exit_code": 0, "stdout": "...", "stderr": "...", "finished_at": "..."}`

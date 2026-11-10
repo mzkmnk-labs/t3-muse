@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1254" width="1240" height="1254" role="img" aria-labelledby="title desc">
   <title id="title">t3-muse 構成図</title>
-  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行う。watcher はブリッジでの読み取りが失敗したとき、このスレッド一覧にフォールバックする。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。watcher は 2 分ごとにメールボックス経由で t3r.py の status を取得する。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。T3 Code は DB を読み書きする。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
+  <desc id="desc">ユーザーはチャットで Muse と対話し、Muse は PM として 2 つの経路でタスクを T3 Code に dispatch する。経路1 (操作系・既定): Muse はカスタムコネクタ custom.t3code を通って T3 Connect リレー (HTTPS、OAuth 認可コード＋動的登録、30 日セッション、モード上限あり) に接続し、リレーは環境の公式 MCP サーバー (/mcp) に到達して T3 Code サーバーを操作する。この経路でスレッドの起動・送信・読み取り・一覧を行う。watcher はブリッジでの読み取りが失敗したとき、このスレッド一覧にフォールバックする。経路2 (ファイルメールボックス・ブリッジ): Muse はペアデバイス経由で Mac Studio 上のファイルメールボックスにリクエスト JSON を書き、メールボックスは Muse に結果 JSON を返す。launchd 常駐の bridge.py は inbox をポーリングし、許可したコマンドだけを実行する。t3r.py は MCP にできない処理として、T3 Code 状態 DB を読み取り専用で開く。watcher は 2 分ごとにメールボックス経由で t3r.py の status を取得する。t3a.py はユーザーがチャットで決めた回答だけを、t3 CLI で発行・更新するトークンを使ってループバックの WebSocket で T3 Code の承認待ち・質問待ちへ中継する。承認には --user-approved が必須で、MCP の t3_pending_request は質問にしか回答できないため、承認はこの経路を使う。t3w.py は MCP が使えないときのフォールバックで、t3 CLI を通じてスレッド作成とプロンプト送信を行い、t3 CLI はローカルセッションで T3 Code につながる。t3g.py はユーザーが頼んだ GitHub リポジトリを、ユーザー自身の git の認証情報を使って ghq で ghq root に取得し、T3 のプロジェクトとして登録できるようにする。T3 Code は DB を読み書きする。別に、メールボックスの restart-trigger フォルダにファイルを置くと launchd が番人の restart-bridge.sh を実行し、ブリッジのジョブだけを再起動する。</desc>
 
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", Meiryo, Roboto, Helvetica, Arial, sans-serif; }
@@ -161,19 +161,22 @@
     <text x="680" y="466">inbox をポーリング</text>
   </g>
   <g class="edge from-muse" data-from="Bridge" data-to="Reader">
-    <path marker-end="url(#arrow-muse)" d="M210 616 V694"/>
-    <text class="c" x="369" y="660">許可したコマンドだけ実行</text>
+    <path marker-end="url(#arrow-muse)" d="M138 616 V694"/>
+  </g>
+  <g class="edge from-muse" data-from="Bridge" data-to="Fetcher">
+    <path marker-end="url(#arrow-muse)" d="M332 616 V694"/>
   </g>
   <g class="edge from-muse" data-from="Bridge" data-to="Answers">
-    <path marker-end="url(#arrow-muse)" d="M528 616 V694"/>
+    <path marker-end="url(#arrow-muse)" d="M560 616 V694"/>
+    <text class="c" x="446" y="660">許可したコマンドだけ実行</text>
   </g>
   <g class="edge from-muse" data-from="Bridge" data-to="Writer">
-    <path marker-end="url(#arrow-muse)" d="M784 616 V694"/>
-    <text class="c" x="656" y="660">許可したコマンドだけ実行</text>
+    <path marker-end="url(#arrow-muse)" d="M792 616 V694"/>
+    <text class="c" x="676" y="660">許可したコマンドだけ実行</text>
   </g>
   <g class="edge from-muse" data-from="Reader" data-to="DB">
-    <path marker-end="url(#arrow-muse)" d="M210 870 V1008"/>
-    <text x="220" y="935">読み取り専用で開く</text>
+    <path marker-end="url(#arrow-muse)" d="M138 870 V1008"/>
+    <text x="148" y="935">読み取り専用で開く</text>
   </g>
   <g class="edge from-muse" data-from="Answers" data-to="T3">
     <path marker-end="url(#arrow-muse)" d="M520 870 V1138"/>
@@ -242,7 +245,7 @@
     <text class="chip-label mono c" x="814" y="406">done</text>
   </g>
   <g id="node-Bridge" class="muse">
-    <rect class="shape" x="186" y="528" width="624" height="88" rx="12"/>
+    <rect class="shape" x="128" y="528" width="740" height="88" rx="12"/>
     <text class="t mono c" x="498" y="564">bridge.py</text>
     <text class="s c" x="498" y="590">launchd 常駐・許可リスト検証</text>
   </g>
@@ -253,27 +256,36 @@
     <text class="s c" x="160" y="432">ブリッジだけ再起動</text>
   </g>
   <g id="node-Reader" class="muse">
-    <rect class="shape" x="48" y="696" width="324" height="174" rx="12"/>
-    <text class="t mono c" x="210" y="732">t3r.py</text>
-    <text class="s c" x="210" y="768">読み取り専用で参照</text>
-    <text class="s c" x="210" y="789">MCP にない DB 参照</text>
-    <text class="p c" x="210" y="822">watcher が 2 分ごとに <tspan class="mono">status</tspan> を取得</text>
-    <text class="p mono c" x="210" y="852">~/t3-muse-tools</text>
+    <rect class="shape" x="48" y="696" width="180" height="174" rx="12"/>
+    <text class="t mono c" x="138" y="732">t3r.py</text>
+    <text class="s c" x="138" y="768">読み取り専用で参照</text>
+    <text class="s c" x="138" y="789">MCP にない DB 参照</text>
+    <text class="p c" x="138" y="812">watcher が 2 分ごとに</text>
+    <text class="p c" x="138" y="830"><tspan class="mono">status</tspan> を取得</text>
+    <text class="p mono c" x="138" y="852">~/t3-muse-tools</text>
+  </g>
+  <g id="node-Fetcher" class="muse">
+    <rect class="shape" x="244" y="696" width="176" height="174" rx="12"/>
+    <text class="t mono c" x="332" y="732">t3g.py</text>
+    <text class="s c" x="332" y="768">ユーザーが頼んだ</text>
+    <text class="s c" x="332" y="789">GitHub リポジトリを取得</text>
+    <text class="p c" x="332" y="822"><tspan class="mono">ghq get</tspan> でクローン</text>
+    <text class="p mono c" x="332" y="852">~/t3-muse-tools</text>
   </g>
   <g id="node-Answers" class="muse">
-    <rect class="shape" x="392" y="696" width="272" height="174" rx="12"/>
-    <text class="t mono c" x="528" y="732">t3a.py</text>
-    <text class="s c" x="528" y="768">ユーザーがチャットで決めた</text>
-    <text class="s c" x="528" y="789">回答だけを中継</text>
-    <text class="p c" x="528" y="822">承認は <tspan class="mono">--user-approved</tspan> 必須</text>
-    <text class="p mono c" x="528" y="852">~/t3-muse-tools</text>
+    <rect class="shape" x="436" y="696" width="248" height="174" rx="12"/>
+    <text class="t mono c" x="560" y="732">t3a.py</text>
+    <text class="s c" x="560" y="768">ユーザーがチャットで決めた</text>
+    <text class="s c" x="560" y="789">回答だけを中継</text>
+    <text class="p c" x="560" y="822">承認は <tspan class="mono">--user-approved</tspan> 必須</text>
+    <text class="p mono c" x="560" y="852">~/t3-muse-tools</text>
   </g>
   <g id="node-Writer" class="muse">
-    <rect class="shape" x="684" y="696" width="200" height="174" rx="12"/>
-    <text class="t mono c" x="784" y="732">t3w.py</text>
-    <text class="s c" x="784" y="768">MCP が使えないときの</text>
-    <text class="s c" x="784" y="789">フォールバック</text>
-    <text class="p mono c" x="784" y="852">~/t3-muse-tools</text>
+    <rect class="shape" x="700" y="696" width="184" height="174" rx="12"/>
+    <text class="t mono c" x="792" y="732">t3w.py</text>
+    <text class="s c" x="792" y="768">MCP が使えないときの</text>
+    <text class="s c" x="792" y="789">フォールバック</text>
+    <text class="p mono c" x="792" y="852">~/t3-muse-tools</text>
   </g>
   <g id="node-DB" class="t3">
     <path class="shape" d="M48 1020 A162 13 0 0 1 372 1020 V1198 A162 13 0 0 1 48 1198 Z"/>

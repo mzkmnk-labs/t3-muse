@@ -1,6 +1,6 @@
 # T3 Muse Bridge
 
-Use this skill whenever you send a request to the t3-muse bridge on the user's Mac: to check the bridge with bridge-ping, read T3 Code's state with t3r, start and message threads with t3w, list and answer pending approvals and questions with t3a, or restart the bridge daemon.
+Use this skill whenever you send a request to the t3-muse bridge on the user's Mac: to check the bridge with bridge-ping, read T3 Code's state with t3r, start and message threads with t3w, list and answer pending approvals and questions with t3a, fetch a GitHub repository onto the Mac with t3g, or restart the bridge daemon.
 
 ## Know the layout
 
@@ -23,7 +23,7 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 | `bridge.log` | The daemon's own output |
 | `restart.log` | One line per restart |
 
-- The tools the bridge runs sit in ~/t3-muse-tools: t3r.py, t3w.py and t3a.py. The approval token file .t3a-token sits there too, and you never open it.
+- The tools the bridge runs sit in ~/t3-muse-tools: t3r.py, t3w.py, t3a.py and t3g.py. The approval token file .t3a-token sits there too, and you never open it.
 
 ## Send a request
 
@@ -72,7 +72,7 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 - Read ok first. ok true means the bridge ran the command, and the command's own result is in exit_code, stdout and stderr. A tool that failed still comes back with ok true and a nonzero exit_code. ok false means the command did not run to the end: error says why, exit_code is always 2, and there is no stdout or stderr. A tool's own usage error also exits 2, so never judge a reply by exit_code alone.
 
-- stdout and stderr are strings. The tools print JSON, except t3w add-project, so parse stdout as JSON, and stderr too for t3a errors. Each stream is cut to its first 200,000 characters with no marker.
+- stdout and stderr are strings. The tools print JSON, except t3w add-project, so parse stdout as JSON, and stderr too for t3a errors. t3g's stderr is ghq's own output, as plain text. Each stream is cut to its first 200,000 characters with no marker.
 
 - finished_at is the Mac's local time with its UTC offset.
 
@@ -104,10 +104,11 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 | t3r | `["python3", "t3r.py", "schema" \| "health" \| "status"]` | `T3M_DB`, `T3M_T3CLI` | 120 |
 | t3w | `["python3", "t3w.py", <command>, ...]`, commands start, send, show, list and add-project | `T3M_DB`, `T3M_T3CLI` | 120, or 600 with --wait |
 | t3a | `["python3", "t3a.py", <command>, ...]`, commands issue-token, renew, pending and answer | `T3M_T3CLI`, `T3M_T3_HOME` | 120, or 300 for renew |
+| t3g | `["python3", "t3g.py", "get", <owner>/<repo>]` | None | 600 |
 
 - The first two strings are always exactly "python3" and the tool's file name. Anything else, such as a path to the tool or another program, is refused.
 
-- The env variables point a tool at non-default paths: `T3M_DB` at the state database (default ~/.t3/userdata/statev2.sqlite), `T3M_T3CLI` at the T3 CLI (default ~/.t3/bin/t3), and `T3M_T3_HOME` at the T3 home folder (default ~/.t3). The defaults match a normal install, so leave env out.
+- The env variables point a tool at non-default paths: `T3M_DB` at the state database (default ~/.t3/userdata/statev2.sqlite), `T3M_T3CLI` at the T3 CLI (default ~/.t3/bin/t3), and `T3M_T3_HOME` at the T3 home folder (default ~/.t3). The defaults match a normal install, so leave env out. t3g takes no env at all and always runs with the daemon's own environment.
 
 ### bridge-ping
 
@@ -261,6 +262,39 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
   - MULTI_QUESTION, NOT_ANSWERABLE, DETAILS_UNAVAILABLE, DECISION_NOT_OFFERED: t3a cannot answer this one, so the user answers it in the T3 Code app.
   - ANSWER_NOT_A_CHOICE: send one of the question's options.
 
+### t3g: fetch a repository
+
+- t3g clones a GitHub repository onto the Mac with ghq, so you can register it as a T3 project with t3w add-project without asking the user to run a terminal command. It needs ghq and git on the Mac. T3 Code need not be running. Run it only for a repository the user asked for.
+
+| Command after `"python3", "t3g.py"` | Does |
+|---|---|
+| `"get", <owner>/<repo>` | Clones the repository into the ghq root, or reports that its folder is already there |
+
+- `<owner>/<repo>` is the repository's owner and name joined by one /, such as octo-org/web-app, up to 100 characters. Each part starts with a letter or a digit, and the rest are letters, digits, `.`, `_` or `-`. Neither part may contain `..`, and the name must not end in .git. get takes nothing else: no URL, host, branch or option.
+
+- t3g always fetches `https://github.com/<owner>/<repo>` and places it at `<ghq root>/github.com/<owner>/<repo>`. The ghq root is what `ghq root` prints in the bridge's environment, or ~/ghq when it prints nothing usable. A request cannot change the host, the root or the program, because the bridge passes no env to t3g.
+
+- get prints `{"repo", "url", "path", "status"}`. path is the absolute checkout folder, which t3w add-project takes as it is. status is `cloned`, or `already_present` when the folder was already there. In that case t3g clones nothing and leaves the folder as it is, without updating it or checking what is in it.
+
+- Give get timeout 600. A clone can take minutes, and t3g gives ghq up to 560 seconds, then stops it together with git, which removes the partial clone. A long clone holds back every other bridge request, the watcher's poll included. With a shorter timeout the bridge stops t3g but not ghq, which can go on cloning with nobody waiting. If that happens, wait a few minutes before you send get again, because a folder that a running clone is still filling already counts as already_present.
+
+- git never prompts. A private repository clones only when git can reach it with credentials the user's git config already provides, such as a credential helper. Otherwise get fails at once, and the user sets up access on the Mac or runs ghq get in their own terminal.
+
+- t3g runs with the bridge daemon's environment, which launchd starts without the user's shell profile. A GHQ_ROOT set only in that profile does not apply, and the user can set the root with `git config --global ghq.root <path>` instead. Tell the user when path is not where they expected it.
+
+- t3g looks for ghq on the daemon's PATH, then in /opt/homebrew/bin and /usr/local/bin, because launchd's PATH leaves Homebrew out.
+
+- t3g's failures are `{"error": "..."}` on stdout, with ghq's own output in stderr. exit_code tells them apart:
+
+| exit_code | Cause |
+|---|---|
+| 2 | A usage error or a malformed `<owner>/<repo>` |
+| 3 | ghq is not found. Ask the user to install it |
+| 4 | ghq ran past 560 seconds and was stopped |
+| 5 | The fetch failed: ghq exited nonzero, as for a repository that does not exist or that git could not reach, the folder was missing afterwards, or something that is not a folder holds its place |
+
+- On exit 4 and 5 the error also carries path.
+
 ## Replace bridge and tool files
 
 - Write the new file over the old one through the device channel, as `~/t3-muse-bridge/bridge.py` or `~/t3-muse-tools/<tool>.py`, and read it back to verify it.
@@ -309,7 +343,7 @@ Use this skill whenever you send a request to the t3-muse bridge on the user's M
 
 - Never add --user-approved on your own judgment. Relay only the decisions the user made in chat.
 
-- Run t3w start and send only for work the user asked for.
+- Run t3w start and send only for work the user asked for, and t3g get only for a repository the user asked for.
 
 - Leave done/ and outbox/ as they are. They are the audit record of every request.
 

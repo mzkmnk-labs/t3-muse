@@ -18,7 +18,7 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - Setup starts in chat. The user sends you one sentence that points at setup.md, or at setup.ja.md in Japanese, on raw.githubusercontent.com, and you lead from there. The installer is not the entry point but a step you hand the user in chat when you reach it, like the token prompt, copying the MCP URL and approving the sign-in.
 
-- Setup builds two channels. The official T3 MCP over T3 Connect carries thread operations. The file mailbox bridge covers what MCP cannot do: it reads the T3 database, relays approval and question answers, restarts the daemon and stands in when Connect is down.
+- Setup builds two channels. The official T3 MCP over T3 Connect carries thread operations. The file mailbox bridge covers what MCP cannot do: it reads the T3 database, relays approval and question answers, fetches repositories onto the Mac, restarts the daemon and stands in when Connect is down.
 
 - Require the Mac to be paired with Muse as a device before you set up the bridge. You place every mailbox request and read every reply through that pairing, so without it the bridge cannot be verified or used. The MCP channel does not need it. If the Mac is not paired, ask the user to open the Muse app on that Mac and pair it, and confirm you can reach it as a device before you go on. The installer's own checks run locally on the Mac, so a passing install says nothing about the pairing.
 
@@ -38,13 +38,15 @@ Use this skill to set up t3-muse from scratch on a fresh Mac: install the bridge
 
 - A TOKEN_REJECTED is never asked about, so replace that token with t3a renew.
 
+- Fetching a repository through the bridge with t3g get needs ghq and git on the Mac. The installer does not check for them, and nothing else in setup needs them. If the user wants you to fetch repositories, ask whether ghq is installed, and if not, ask them to install it, for example with Homebrew.
+
 - Fall back to the manual steps below only when the installer cannot be used. Place files through the paired Mac device channel, which has no shell, so every Mac side action goes through the bridge allowlist or through a plist the user loads once.
 
 - Clone the t3-muse repository and read its README and bridge README before placing any files.
 
 - Create the folder ~/t3-muse-bridge with inbox, outbox, done and restart-trigger inside it, plus the folder ~/t3-muse-tools.
 
-- Place bridge.py and restart-bridge.sh in ~/t3-muse-bridge and place t3r.py, t3w.py and t3a.py in ~/t3-muse-tools.
+- Place bridge.py and restart-bridge.sh in ~/t3-muse-bridge and place t3r.py, t3w.py, t3a.py and t3g.py in ~/t3-muse-tools.
 
 - Expand the __HOME__ placeholder in both LaunchAgent plists to the user's home directory and place them in ~/Library/LaunchAgents.
 

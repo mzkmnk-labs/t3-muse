@@ -18,7 +18,8 @@
     "bridge/com.muse.t3bridge-restarter.plist",
     "tools/t3r.py",
     "tools/t3w.py",
-    "tools/t3a.py"
+    "tools/t3a.py",
+    "tools/t3g.py"
   ],
   "engines": {
     "node": ">=24"

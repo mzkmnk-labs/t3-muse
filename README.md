@@ -38,7 +38,7 @@ see [Manual setup](#manual-setup).
 
 ## Architecture
 
-![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads, and the watcher falls back to the thread list when the bridge read fails. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py and t3a.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do, and the watcher fetches its status through the mailbox every two minutes. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues and renews through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. T3 Code reads and writes the DB. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
+![Architecture diagram. The user talks to Muse in chat, and Muse acts as PM, dispatching tasks to T3 Code over two paths. Path 1, the default for operations: Muse goes through the custom connector custom.t3code to the T3 Connect relay (HTTPS, OAuth authorization code with dynamic registration, a 30-day session and a mode cap), and the relay reaches the environment's official MCP server at /mcp, which operates the T3 Code server. This path starts, sends to, reads and lists threads, and the watcher falls back to the thread list when the bridge read fails. Path 2, the file mailbox bridge: Muse writes request JSON to the file mailbox on the Mac Studio through the paired device, and the mailbox returns result JSON to Muse. bridge.py polls the inbox and runs allowlisted commands only, on t3r.py, t3w.py, t3a.py and t3g.py. t3r.py opens the T3 Code state DB read-only, which the MCP cannot do, and the watcher fetches its status through the mailbox every two minutes. t3a.py relays only the answers the user decided in chat to T3 Code's pending approvals and questions over a loopback WebSocket, using a token it issues and renews through the t3 CLI; approvals need --user-approved, and they use this path because the MCP's t3_pending_request answers questions only. t3w.py is the fallback when the MCP is unavailable: it creates threads and sends prompts through the t3 CLI, which reaches T3 Code over a local session. t3g.py fetches a GitHub repository the user asked for into the ghq root with ghq, using the user's own git credentials, so it can be registered as a T3 project. T3 Code reads and writes the DB. Separately, a file in the mailbox's restart-trigger folder makes launchd run restart-bridge.sh, a watchman that restarts only the bridge job.](docs/architecture.svg)
 
 The user talks to Muse, the product. Muse acts as PM and dispatches tasks
 to T3 Code over two paths.
@@ -60,6 +60,9 @@ allowlist only), which runs:
 - `t3a.py`, which relays answers to approvals and questions. It relays only
   what the user decided in chat, and approvals need `--user-approved`.
 - `t3w.py`, the fallback when the MCP is unavailable.
+- `t3g.py`, which fetches a GitHub repository onto the Mac with `ghq get`,
+  so Muse can register it as a T3 project without the user running a
+  terminal command.
 
 A watchman, `restart-bridge.sh`, restarts the daemon when a file lands in
 `restart-trigger`.
@@ -109,7 +112,12 @@ Key points:
   Muse places and fetches the files through the paired device.
 - The bridge listens on no network port and runs nothing outside its
   allowlist (`bridge-ping`, the read-only `t3r.py` commands, the
-  task-request `t3w.py` commands, and the answer-relay `t3a.py` commands).
+  task-request `t3w.py` commands, the answer-relay `t3a.py` commands, and
+  the repository-fetch `t3g.py get`).
+- `t3g.py` is the only bridge tool that reaches beyond the Mac. It fetches
+  only `https://github.com/<owner>/<repo>`, into a fixed place under the
+  ghq root, with the user's own git credentials. A request cannot pass it a
+  URL, a flag or environment variables, and git never prompts.
 - Direct database access is read-only. Task requests to T3 go through the
   official MCP by default and through T3 Code's own CLI (`t3w.py`) only
   when the MCP is unavailable, in both cases only for requests the user
@@ -131,7 +139,7 @@ PAT instead.
 | Path | Contents |
 |---|---|
 | `bridge/` | The always-on Mac bridge (path 2). Receives requests through the file mailbox via the paired device and runs allowlisted commands only (design notes in `bridge/README.md`) |
-| `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `renew` / `pending` / `answer`) |
+| `tools/` | Our own Mac-side tools, run by the bridge (path 2). `t3r.py` is a minimal read-only reader for T3 Code's state database (`schema` / `health` / `status`). `t3w.py` sends task requests through T3's bundled `t3 thread` CLI when the MCP is unavailable (`start` / `send` / `show` / `list` / `add-project`). `t3a.py` relays the user's answers to T3's pending approvals and questions (`issue-token` / `renew` / `pending` / `answer`). `t3g.py` fetches a GitHub repository into the ghq root with `ghq get`, so it can be registered as a T3 project (`get`) |
 | `installer/`, `package.json` | The npm package `@mzkmnk-labs/t3-muse`: a Node CLI with no dependencies that installs the bridge and tools on the Mac (`install` / `status` / `uninstall`) |
 | `muse/skills/t3-muse-starter/` | The custom Muse skill for setting up t3-muse from scratch: the bridge, the MCP connector and verification. [setup.md](setup.md) has Muse place this one, and its last step places the PM and bridge skills |
 | `muse/skills/t3-muse-pm/` | The custom Muse skill for running t3-muse day to day, with Muse as PM and T3 Code as the implementer: dispatching, relaying approvals and questions, monitoring, merging and maintenance |
