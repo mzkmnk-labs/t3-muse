@@ -13,32 +13,7 @@ from pathlib import Path
 
 import bridge
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-import t3g  # noqa: E402
-import test_t3g  # noqa: E402  (the <owner>/<repo> cases and the fake ghq)
-
 UUID = "0f8fad5b-d9cb-469f-a165-70867728950e"
-T3G_REJECTED_ARGV = [
-    ["python3", "t3g.py"],
-    ["python3", "t3g.py", "get"],
-    ["python3", "t3g.py", "get", "a/b", "extra"],
-    ["python3", "t3g.py", "get", "a/b", "--update"],
-    ["python3", "t3g.py", "get", "a/b", ""],
-    ["python3", "t3g.py", "get", "-u", "a/b"],
-    ["python3", "t3g.py", "get", "--", "a/b"],
-    ["python3", "t3g.py", "get", "--shallow"],
-    ["python3", "t3g.py", "get", "-a/b"],
-    ["python3", "t3g.py", "--help"],
-    ["python3", "t3g.py", "-u", "get", "a/b"],
-    ["python3", "t3g.py", "clone", "a/b"],
-    ["python3", "t3g.py", "root"],
-    ["python3", "t3g.py", "GET", "a/b"],
-    ["python3", "./t3g.py", "get", "a/b"],
-    ["python3", "/tmp/t3g.py", "get", "a/b"],
-    ["python", "t3g.py", "get", "a/b"],
-    ["ghq", "get", "a/b"],
-    ["ghq", "get", "https://github.com/a/b"],
-]
 
 
 def thread_id_commands(tid: str) -> list:
@@ -78,42 +53,16 @@ def check_renew_validation() -> None:
         assert "takes no arguments" in (err or ""), extra
 
 
-def check_t3g_validation() -> None:
-    # One table for both validators, so the bridge and the tool agree.
-    for spec in test_t3g.ACCEPTED:
-        assert bridge.validate(["python3", "t3g.py", "get", spec]) is None, spec
-        assert t3g.spec_error(spec) is None, spec
-    for spec in test_t3g.REJECTED:
-        assert bridge.validate(["python3", "t3g.py", "get", spec]), repr(spec)
-        assert t3g.spec_error(spec), repr(spec)
-    for argv in T3G_REJECTED_ARGV:
-        assert bridge.validate(argv), argv
-    err = bridge.validate(["python3", "t3g.py", "get", "-a/b"])
-    assert "must not start with -" in err, err
-    assert bridge.TOOL_ENV_WHITELIST["t3g.py"] == frozenset()
-
-
 def main() -> None:
     check_thread_id_validation()
     check_renew_validation()
-    check_t3g_validation()
 
     root = Path(tempfile.mkdtemp(prefix="bridge-test-"))
     home = root / "home"
     base = home / "t3-muse-bridge"
     for name in ("inbox", "outbox", "done"):
         (base / name).mkdir(parents=True)
-    # The daemon finds the fake ghq on its own PATH, as the real one would be
-    # found; nothing about ghq comes from a request.
-    ghq_state = root / "ghq-state"
-    ghq_state.mkdir()
-    ghq_root = root / "ghq-root"
-    fake_ghq = test_t3g.write_fake(root / "ghq-bin")
-    env = dict(os.environ, HOME=str(home), FAKE_GHQ_STATE=str(ghq_state),
-               FAKE_GHQ_ROOT=str(ghq_root),
-               PATH=os.pathsep.join([str(fake_ghq.parent),
-                                     os.environ.get("PATH", "")]))
-    env.pop("T3M_GHQ", None)
+    env = dict(os.environ, HOME=str(home))
     bridge = Path(__file__).with_name("bridge.py")
     proc = subprocess.Popen(
         [sys.executable, str(bridge)], env=env,
@@ -250,49 +199,6 @@ def main() -> None:
                            argv=["python3", "t3w.py", "add-project",
                                  "relative/path"]))
         assert not r["ok"] and r["exit_code"] == 2, r
-
-        # the repository fetcher: the request's env is dropped, so neither
-        # the program nor the destination can be moved from the mailbox
-        shutil.copy(repo_root / "tools" / "t3g.py", tools_dir / "t3g.py")
-        gget = ["python3", "t3g.py", "get", "octo-org/web-app"]
-        checkout = ghq_root / "github.com" / "octo-org" / "web-app"
-        elsewhere = root / "elsewhere"
-        r = roundtrip({"id": "t-gclone", "argv": gget, "timeout": 600,
-                       "env": {"T3M_GHQ": str(root / "no-such-ghq"),
-                               "GHQ_ROOT": str(elsewhere),
-                               "FAKE_GHQ_ROOT": str(elsewhere),
-                               "GIT_TERMINAL_PROMPT": "1",
-                               "PATH": "/nonexistent"}})
-        assert r["ok"] and r["exit_code"] == 0, r
-        assert json.loads(r["stdout"]) == {
-            "repo": "octo-org/web-app",
-            "url": "https://github.com/octo-org/web-app",
-            "path": str(checkout),
-            "status": "cloned",
-        }, r
-        assert checkout.is_dir() and not elsewhere.exists(), r
-        calls = [json.loads(line)
-                 for line in (ghq_state / "calls").read_text().splitlines()]
-        assert [c["argv"] for c in calls] == [
-            ["root"], ["get", "https://github.com/octo-org/web-app"]], calls
-        assert all(c["prompt"] == "0" for c in calls), calls
-
-        r = roundtrip({"id": "t-gagain", "argv": gget})
-        assert r["ok"] and r["exit_code"] == 0, r
-        again = json.loads(r["stdout"])
-        assert again["status"] == "already_present", r
-        assert again["path"] == str(checkout), r
-
-        # malformed shapes are refused before anything runs
-        calls_before = (ghq_state / "calls").read_text()
-        for i, argv in enumerate(T3G_REJECTED_ARGV + [
-                ["python3", "t3g.py", "get", "owner/repo.git"],
-                ["python3", "t3g.py", "get", "../etc"],
-                ["python3", "t3g.py", "get", "owner/repo\n"]]):
-            r = roundtrip({"id": f"t-greject-{i}", "argv": argv})
-            assert not r["ok"] and r["exit_code"] == 2, (argv, r)
-            assert "stdout" not in r, (argv, r)
-        assert (ghq_state / "calls").read_text() == calls_before
 
         # the answer relay: validators reject before anything runs
         shutil.copy(repo_root / "tools" / "t3a.py", tools_dir / "t3a.py")

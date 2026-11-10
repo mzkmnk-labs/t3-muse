@@ -9,13 +9,11 @@ Design rules:
 - No network listener. The only input is local files in the inbox folder.
 - Allowlist only: the built-in bridge-ping, our read-only reader
   t3r.py (schema / health / status), our task writer t3w.py
-  (start / send / show / list / add-project — the only write path into
-  T3 Code, run solely for requests the user asked Muse to make), our
-  answer relay t3a.py (issue-token / renew / pending / answer — only
-  relays decisions the user made; approvals need --user-approved), and our
-  repository fetcher t3g.py (get <owner>/<repo> — clones one GitHub
-  repository into the ghq root, only for a repository the user asked
-  for). No arbitrary shell, no other programs.
+  (start / send / show / list — the only write path, run solely for
+  requests the user asked Muse to make), and our answer relay t3a.py
+  (issue-token / renew / pending / answer — only relays decisions the user
+  made; approvals need --user-approved). No arbitrary shell, no other
+  programs.
 - Every request and result is archived under done/ for audit.
 """
 import json
@@ -48,20 +46,6 @@ REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9:%_.~-]{0,799}")
 APPROVAL_RESPONSES = {"approve", "deny"}
 USER_APPROVED = "--user-approved"
 MAX_ANSWER = 4000
-# The same <owner>/<repo> rules as t3g.py's spec_error; test_bridge.py runs
-# one table of cases through both.
-REPO_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
-MAX_REPO_SPEC = 100
-# What a request's env may set, per tool. t3g gets nothing: it runs with the
-# daemon's own environment, so ghq and git see the user's normal HOME and git
-# config, while a request cannot set GHQ_ROOT, GIT_* or T3M_GHQ to move the
-# checkout or pick the program.
-TOOL_ENV_WHITELIST = {
-    "t3r.py": ENV_WHITELIST,
-    "t3w.py": ENV_WHITELIST,
-    "t3a.py": T3A_ENV_WHITELIST,
-    "t3g.py": frozenset(),
-}
 
 
 def _validate_start(rest):
@@ -159,29 +143,6 @@ def _validate_t3a(rest, sub):
     return None
 
 
-def _repo_spec_error(spec):
-    if len(spec) > MAX_REPO_SPEC:
-        return "t3g get repository spec too long"
-    parts = spec.split("/")
-    if len(parts) != 2 or not all(REPO_SEGMENT.fullmatch(p) for p in parts):
-        return "t3g get needs <owner>/<repo>"
-    if ".." in spec:
-        return "t3g get repository spec must not contain .."
-    if parts[1].lower().endswith(".git"):
-        return "t3g get repository spec must not end in .git"
-    return None
-
-
-def _validate_t3g(rest, sub):
-    if sub != "get":
-        return f"t3g.py subcommand not allowed: {sub}"
-    if len(rest) != 1:
-        return "t3g get needs exactly one <owner>/<repo>"
-    if rest[0].startswith("-"):
-        return "t3g arguments must not start with -"
-    return _repo_spec_error(rest[0])
-
-
 def validate(argv):
     """Return an error string, or None when the argv is allowed."""
     if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
@@ -196,8 +157,6 @@ def validate(argv):
         return _validate_writer(argv[3:], argv[2])
     if argv[:2] == ["python3", "t3a.py"] and len(argv) >= 3:
         return _validate_t3a(argv[3:], argv[2])
-    if argv[:2] == ["python3", "t3g.py"] and len(argv) >= 3:
-        return _validate_t3g(argv[3:], argv[2])
     return "command not on the allowlist"
 
 
@@ -222,7 +181,7 @@ def run_request(req):
         }
     env = dict(os.environ)
     req_env = req.get("env") or {}
-    allowed_env = TOOL_ENV_WHITELIST[argv[1]]
+    allowed_env = T3A_ENV_WHITELIST if argv[1] == "t3a.py" else ENV_WHITELIST
     if isinstance(req_env, dict):
         for key, value in req_env.items():
             if key in allowed_env and isinstance(value, str):
