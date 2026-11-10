@@ -117,6 +117,7 @@ function pathsFor(home) {
       { source: 'tools/t3r.py', target: path.join(tools, 't3r.py'), mode: 0o644 },
       { source: 'tools/t3w.py', target: path.join(tools, 't3w.py'), mode: 0o644 },
       { source: 'tools/t3a.py', target: path.join(tools, 't3a.py'), mode: 0o644 },
+      { source: 'tools/t3g.py', target: path.join(tools, 't3g.py'), mode: 0o644 },
     ],
     // In load order. Unloading goes the other way, so the restarter cannot
     // kick the bridge while the bridge is on its way down.

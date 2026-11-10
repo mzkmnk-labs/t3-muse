@@ -119,6 +119,8 @@ jobs:
         run: python3 tools/test_t3w.py
       - name: Answer relay unit tests
         run: python3 tools/test_t3a.py
+      - name: Fetcher unit tests
+        run: python3 tools/test_t3g.py
       - name: Skill audit unit tests
         run: python3 .claude/hooks/test_skill_audit.py
       - name: Installer dry-run test
