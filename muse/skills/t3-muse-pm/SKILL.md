@@ -30,6 +30,16 @@ Use this skill to run t3-muse day to day once it is set up, with Muse as PM and 
 
 - Launch threads through the MCP connector with a project id, a worktree workspace strategy from the base ref and a unique client request id that you reuse if a reply is lost.
 
+- To run a thread on a chosen model, pass modelSelection with instanceId next to model. instanceId names the provider instance, and for the Claude provider it is claudeAgent. The launch is rejected without it, even where the tool schema lists only model as required, with an error like Invalid parameters ... Expected string at ["modelSelection"]["instanceId"].
+
+- Pass effort in options as a list of id and value pairs, not as an object such as {"effort": "high"}. This selection launches Claude Fable 5.2 at high effort:
+
+```json
+{"instanceId": "claudeAgent", "model": "claude-fable-5-2", "options": [{"id": "effort", "value": "high"}]}
+```
+
+- Read the models a provider offers again at dispatch time rather than trusting a list you remember. The set can change from one read to the next, so check that the model you pick is offered before you launch.
+
 - Write each brief so a fresh agent can finish without this chat. Include the background, the exact scope, the checks to run, the instruction to open a pull request, and the rule that T3 never merges its own pull requests.
 
 - Pick the thread by what the work is. When the work continues the task a thread is already on, send the follow up to that same thread instead of starting a new one.
